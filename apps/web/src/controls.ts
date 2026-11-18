@@ -7,8 +7,8 @@
 // orbit round the fly (orbit.ts). A drag turns it round the fly and up or
 // down, wherever it starts, with whichever button, by the same amount for the
 // same distance dragged every time, unless the tool in hand is one that is
-// held on the fly (the feather, the air), which a left-button drag over the
-// table carries. A mouse wheel's clicks and a pinch bring it in and take it
+// held on the fly (the feather, the air) or placed in the world (the
+// fingertip), which a left-button drag over the table carries. A mouse wheel's clicks and a pinch bring it in and take it
 // out, and nothing else; a trackpad's two-finger scroll turns it round and up,
 // as a drag does. A click or a tap uses the tool where it lands; a double
 // click or tap in the air takes the camera back to Follow's distance and
@@ -21,8 +21,13 @@ import type { Gesture } from "./input.ts";
 import type { Dial } from "./tools/hands.ts";
 import { HUD_HITS } from "./ui/hud.ts";
 
-/** How the tool in hand is used on the table: once, where a click or a tap lands (food, the ball); held, where the pointer is held (the feather, the air); or not there at all. */
-export type ToolUse = "once" | "hold" | "none";
+/**
+ * How the tool in hand is used on the table: once, where a click or a tap
+ * lands (food, the ball); held, where the pointer is held (the feather, the
+ * air); placed, going where a press goes and carried by a drag, a tap putting
+ * it down or lifting it (the fingertip); or not there at all.
+ */
+export type ToolUse = "once" | "hold" | "place" | "none";
 
 /** The game, as the controls see it. */
 export interface PlayTarget {
@@ -75,6 +80,8 @@ type Grip =
   | { kind: "press"; x: number; y: number }
   /** Holding a held tool on the table. */
   | { kind: "tool" }
+  /** Down on the table with a placed tool: a drag carries it, and a tap puts it down or lifts it. */
+  | { kind: "place" }
   /** Turning the camera. */
   | { kind: "turn"; x: number; y: number }
   /** Nothing more until it lifts (something else took it). */
@@ -158,6 +165,7 @@ export class PlayControls {
         }
         const onWorld = target.aim(g.x, g.y, true);
         if (onWorld && target.tool() === "hold") this.#grip = { kind: "tool" };
+        else if (onWorld && target.tool() === "place") this.#grip = { kind: "place" };
         else if (onWorld) this.#grip = { kind: "press", x: g.x, y: g.y };
         else this.#turn(g.x, g.y, target);
         return;
@@ -165,7 +173,7 @@ export class PlayControls {
       case "drag":
         this.previewTool = -1;
         if (!grip) return;
-        if (grip.kind === "tool") target.aim(g.x, g.y, true);
+        if (grip.kind === "tool" || grip.kind === "place") target.aim(g.x, g.y, true);
         else if (grip.kind === "press") {
           if (!g.far) return;
           // Moved past a tap: it is turning the camera, from where it went down.
@@ -198,6 +206,9 @@ export class PlayControls {
           if (g.tap && target.tool() === "once" && !target.hudAt(g.x, g.y) && target.aim(g.x, g.y, true)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "tool") {
+          if (!mouse) target.unaim();
+        } else if (grip.kind === "place") {
+          if (g.tap && !target.hudAt(g.x, g.y)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "turn") {
           target.holdCamera(false);

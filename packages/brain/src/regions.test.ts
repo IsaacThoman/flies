@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { loadConnectome } from "./format.ts";
-import { decode, READOUTS, SENSES } from "./io.ts";
+import { decode, READOUTS, SENSES, wire } from "./io.ts";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "./node.ts";
 import { REGIONS, REGION_RATE_NAMES, regionIdOf, regionOf } from "./regions.ts";
 import type { Annotations } from "./regions.ts";
@@ -163,8 +163,10 @@ test("on the real connectome the senses' and the commands' neurons are where the
   within(sense("bumpLeft"), "johnston-left");
   within(sense("bumpRight"), "johnston-right");
   within(sense("wind"), "johnston-left", "johnston-right");
-  within(sense("touch head"), "head-bristles");
-  within(sense("touch body"), "bristles");
+  // Touch's regions: the head's bristles; the body's are the cord's bristles, the notum's, the legs' and the abdomen's.
+  const touch = (name: string) => wire(c).senses.find((g) => g.spec.name === name)!.neurons;
+  within(touch("touch head"), "head-bristles");
+  within(touch("touch body"), "bristles", "thorax-sensory", "leg-sensory", "abdomen-sensory");
   within(sense("sweet"), "mouthparts");
   within(sense("grounded"), "proprioceptors");
   within(sense("wingbeat"), "proprioceptors");

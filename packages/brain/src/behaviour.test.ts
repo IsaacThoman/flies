@@ -43,7 +43,7 @@ test("every group finds its neurons in the real connectome, and none is both dri
     loomLeft: 165,
     loomRight: 146,
     "touch head": 932,
-    "touch body": 2206,
+    "touch body": 3598,
     bumpLeft: 203,
     bumpRight: 132,
     wind: 475,
@@ -65,8 +65,27 @@ test("every group finds its neurons in the real connectome, and none is both dri
     MN9: 2,
     pIP10: 2,
   });
-  const driven = new Set([...wiring.senses, ...wiring.background].flatMap((g) => [...g.neurons]));
+  // The aristae's thermoreceptors, each antenna's own: three of each in a real arista (Budelli et al. 2019).
+  assert.deepEqual(Object.fromEntries(wiring.thermo.map((g) => [g.spec.name, g.neurons.length])), { "heating left": 4, "cooling left": 3, "heating right": 3, "cooling right": 4 });
+  const driven = new Set([...wiring.senses, ...wiring.background, ...wiring.thermo].flatMap((g) => [...g.neurons]));
   for (const group of wiring.readouts) for (const i of group.neurons) assert.ok(!driven.has(i), `${group.spec.name} neuron ${i} is also driven`);
+  // Touch's regions, as README's Senses gives them: every head bristle neuron in one, by part and side.
+  const regions: Record<string, number> = {};
+  for (const group of wiring.senses) group.spec.regions?.forEach((r, k) => (regions[r.sense] = group.ends![k] - (k === 0 ? 0 : group.ends![k - 1])));
+  assert.deepEqual(regions, {
+    touchEyeLeft: 340,
+    touchEyeRight: 405,
+    touchFrontLeft: 39,
+    touchFrontRight: 30,
+    touchOcciputLeft: 9,
+    touchOcciputRight: 25,
+    touchMouthpartsLeft: 44,
+    touchMouthpartsRight: 40,
+    touchNotum: 289,
+    touchWings: 391,
+    touchAbdomen: 1040,
+    touchLegs: 1878,
+  });
 });
 
 test("no seizures: after each sense, and everything at once, at full strength for 2 s, activity is back in the resting band within 1 s", { skip }, () => {
@@ -205,13 +224,15 @@ test("bitter on sugar stops the proboscis; water alone doesn't move it, however 
   assert.ok(feed({ water: 1, thirst: 0 }) < 0.02);
 });
 
-test("touch makes it back away, wind or a push on either antenna makes it groom, sweet makes it feed, and looming opens the wings", { skip }, () => {
+test("touch on its notum makes it back away, on its face groom, as wind or a push on either antenna does; sweet makes it feed, and looming opens the wings", { skip }, () => {
   const restB = brain();
   run(restB, 1000);
   const rest = mean(restB, 1000, RESTING_SENSES);
   // A push on an antenna grooms past 0.2, where the body starts to show it.
   for (const [sense, command, over] of [
-    ["touch", "back", 0.3],
+    ["touchNotum", "back", 0.2],
+    ["touchFrontLeft", "groom", 0.2],
+    ["touchFrontRight", "groom", 0.2],
     ["wind", "groom", 0.3],
     ["bumpLeft", "groom", 0.2],
     ["bumpRight", "groom", 0.2],
@@ -220,7 +241,7 @@ test("touch makes it back away, wind or a push on either antenna makes it groom,
   ] as const) {
     const b = brain();
     run(b, 1000);
-    const response = mean(b, 1000, only(sense));
+    const response = mean(b, 1000, { ...RESTING_SENSES, [sense]: sense.startsWith("touch") ? 1 : FULL[sense as keyof typeof FULL] });
     assert.ok(response[command] > over, `${sense}: ${command} ${response[command]}`);
     assert.ok(rest[command] < 0.1, `at rest: ${command} ${rest[command]}`);
   }

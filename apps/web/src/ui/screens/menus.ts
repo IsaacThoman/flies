@@ -4,6 +4,7 @@
 //         ├─ Watch
 //         ├─ Settings: Screensaver (and how many flies) | On screen | Picture, as tabs
 //         ├─ Online (where it can be): rooms with others (online.ts)
+//         ├─ Journal: the fly's firsts and the player's photos (journal.ts)
 //         └─ About
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
@@ -28,6 +29,7 @@ export function titleScreen(shell: Shell) {
     { kind: "action", id: "settings", label: "Settings" },
     // With others, where there is a way to reach them.
     ...(shell.canPlayOnline ? [{ kind: "action" as const, id: "online", label: "Online" }] : []),
+    { kind: "action", id: "journal", label: "Journal" },
     { kind: "action", id: "about", label: "About" },
   ], { wrap: true });
   // Laid out with the menu, for the backdrop to draw from.
@@ -40,7 +42,7 @@ export function titleScreen(shell: Shell) {
     onActivate(item) {
       if (item.id === "play") shell.play();
       else if (item.id === "watch") shell.watch();
-      else shell.open(item.id as "about" | "settings" | "online");
+      else shell.open(item.id as "about" | "settings" | "online" | "journal");
     },
     // The world behind the menu is the game: tapping it plays.
     onOutside: () => shell.play(),

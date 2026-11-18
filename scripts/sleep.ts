@@ -16,9 +16,11 @@
 //   held there for --minutes of fly time from the sleep pressure the hour
 //   gives: how much of it walking, how often it starts to move, how much
 //   asleep (five minutes or more still) and in how many bouts. --row picks one.
-// threshold: woken or not, over --trials seeds, by a raindrop (touch 0.25 for
-//   0.3 s), the feather resting (0.4 for 5 s), touch 0.6 and stroking (1, 3 s
-//   each), a brief push on both antennae and both pressed for 3 s, the hand-wired
+// threshold: woken or not, over --trials seeds, by the game's touches where they
+//   land (packages/body touch.ts): a raindrop, the feather resting and stroking
+//   on its back and at its face, its face brushed less hard; the same touched all
+//   over (`touch` 0.25 for 0.3 s, 0.4 for 5 s, 0.6 and 1 for 3 s); a brief push on
+//   both antennae and both pressed for 3 s, the hand-wired
 //   looming pulse and a dark disc looming at the right
 //   eye seen through the eyes: awake at night (still, but its depth 0) against
 //   asleep (depth 1).
@@ -26,9 +28,12 @@
 //   night asleep.
 
 import { parseArgs } from "node:util";
-import { Behavior, PACES, Rhythm, SUMMER } from "@fly/body";
+import { Behavior, FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, MOUTH_AHEAD, PACES, Rhythm, SUMMER, TOUCH_PARTS, press } from "@fly/body";
 import type { Intent, DayPace } from "@fly/body";
+import { RAIN_DROP, RAIN_TOUCH } from "../apps/web/src/places/picnic/life.ts";
+import { FEATHER_BRUSH, FEATHER_REST, FEATHER_TIP } from "../apps/web/src/tools/hands.ts";
 import { FlyBrain } from "../packages/brain/src/runtime.ts";
+import { mulberry32 } from "../packages/brain/src/sim.ts";
 import { readConnectomeFile } from "../packages/brain/src/node.ts";
 import { INTERNAL_STATE } from "../packages/brain/src/state.ts";
 import { BATTERY, facetAngles, render } from "../packages/brain/src/stimuli.ts";
@@ -127,7 +132,28 @@ function day() {
   }
 }
 
-type Stimulus = { name: string; ms: number; senses: (t: number, out: BrainSenses) => void };
+/** `t` ms into it, on trial `k`. */
+type Stimulus = { name: string; ms: number; senses: (t: number, out: BrainSenses, k: number) => void };
+
+/** The fly standing at the origin, facing +z, as touch.ts places a contact on it. */
+const STANDING = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+/** How far ahead of its middle the feather rests while it follows the fly, mm (hands.ts). */
+const FACE = (MOUTH_AHEAD + 0.55) * FLY_LENGTH;
+/** The touch senses for a contact on the standing fly. */
+function partsAt(x: number, y: number, z: number, reach: number, strength: number): Partial<BrainSenses> {
+  const out = new Float64Array(TOUCH_PARTS.length);
+  press(STANDING, x, y, z, reach, strength, out);
+  return Object.fromEntries(TOUCH_PARTS.map((part, k) => [part, out[k]]));
+}
+/** The feather `ahead` mm ahead of its middle, resting or stroking (hands.ts, Hands.touch). */
+const feather = (ahead: number, stroking: boolean) => partsAt(0, FLY_HEIGHT, ahead, FEATHER_TIP + (stroking ? FEATHER_BRUSH : 0), stroking ? 1 : FEATHER_REST);
+/** Trial k's raindrop, landing as the picnic's do (life.ts, #dropOn), from its own stream. */
+function raindrop(k: number) {
+  const random = mulberry32(1000 + k);
+  const a = random() * 2 * Math.PI;
+  const r = (Math.sqrt(random()) * FLY_LENGTH) / 2;
+  return partsAt(Math.cos(a) * r, FLY_HEIGHT, Math.sin(a) * r, RAIN_DROP, RAIN_TOUCH);
+}
 
 function threshold() {
   const trials = Number(values.trials);
@@ -142,10 +168,25 @@ function threshold() {
   };
   const ground = lit(() => disc.ground, 0);
   const STIMULI: Stimulus[] = [
-    { name: "a raindrop (touch 0.25, 0.3 s)", ms: 2000, senses: (t, s) => void (s.touch = t < 300 ? 0.25 : 0) },
-    { name: "the feather resting (touch 0.4, 5 s)", ms: 5000, senses: (_, s) => void (s.touch = 0.4) },
-    { name: "touch 0.6 (3 s)", ms: 3000, senses: (_, s) => void (s.touch = 0.6) },
-    { name: "stroking (touch 1, 3 s)", ms: 3000, senses: (_, s) => void (s.touch = 1) },
+    // Where the game's touches land (packages/body touch.ts): a raindrop anywhere within half the fly's length round its middle, a
+    // different place each trial; the feather on its back, where it rests pointed at the fly, and at its face, where it rests following it.
+    { name: "a raindrop where it lands (0.25, 0.3 s)", ms: 2000, senses: (t, s, k) => void (t < 300 && Object.assign(s, raindrop(k))) },
+    { name: "the feather resting on its back (0.4, 5 s)", ms: 5000, senses: (_, s) => void Object.assign(s, feather(0, false)) },
+    { name: "the feather resting at its face (0.4, 5 s)", ms: 5000, senses: (_, s) => void Object.assign(s, feather(FACE, false)) },
+    { name: "stroking its back (1, 3 s)", ms: 3000, senses: (_, s) => void Object.assign(s, feather(0, true)) },
+    { name: "stroking its face (1, 3 s)", ms: 3000, senses: (_, s) => void Object.assign(s, feather(FACE, true)) },
+    { name: "a raindrop on its head (0.25, 0.3 s)", ms: 2000, senses: (t, s) => void (t < 300 && Object.assign(s, partsAt(0, FLY_HEIGHT, HEAD_AHEAD * FLY_LENGTH, RAIN_DROP, RAIN_TOUCH))) },
+    // Its face brushed as stroking brushes it, less hard: where the sleep gate holds a touch back, if anywhere.
+    ...[0.6, 0.4, 0.25].map((strength) => ({
+      name: `its face brushed at ${strength} (3 s)`,
+      ms: 3000,
+      senses: (_: number, s: BrainSenses) => void Object.assign(s, partsAt(0, FLY_HEIGHT, FACE, FEATHER_TIP + FEATHER_BRUSH, strength)),
+    })),
+    // `touch`, every region at once, as all touch was before it landed anywhere.
+    { name: "everywhere: a raindrop (touch 0.25, 0.3 s)", ms: 2000, senses: (t, s) => void (s.touch = t < 300 ? 0.25 : 0) },
+    { name: "everywhere: the feather resting (touch 0.4, 5 s)", ms: 5000, senses: (_, s) => void (s.touch = 0.4) },
+    { name: "everywhere: touch 0.6 (3 s)", ms: 3000, senses: (_, s) => void (s.touch = 0.6) },
+    { name: "everywhere: stroking (touch 1, 3 s)", ms: 3000, senses: (_, s) => void (s.touch = 1) },
     { name: "a brief push on both antennae (bump 1, 0.3 s)", ms: 1000, senses: (t, s) => void (s.bumpLeft = s.bumpRight = t < 300 ? 1 : 0) },
     { name: "both antennae pressed (bump 1, 3 s)", ms: 3000, senses: (_, s) => void (s.bumpLeft = s.bumpRight = 1) },
     { name: "the looming pulse (0.1 s, eyes shut)", ms: 1000, senses: (t, s) => void (s.loomRight = t < 100 ? 1 : 0) },
@@ -167,7 +208,7 @@ function threshold() {
         let left = false;
         for (let t = 0; t < stimulus.ms + 1000; t += TICK) {
           const each: BrainSenses = { ...senses };
-          if (t < stimulus.ms) stimulus.senses(t, each);
+          if (t < stimulus.ms) stimulus.senses(t, each, k);
           const intent = behavior.update(brain.tick(TICK, each).command, 0, true, TICK / 1000);
           if (moving(intent)) woke = true;
           if (movingAway(intent)) left = true;

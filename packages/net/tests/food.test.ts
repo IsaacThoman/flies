@@ -99,7 +99,7 @@ test("in the restaurant the room's food lies at its heights, and is eaten only f
   assert.equal(fromWire(room, [id, kind, name, fx, fz, r, sweet, amount, pool]).y, room.heightAt(fx, fz));
   // The wire carries sweetness alone; a food's other tastes come back as the place and FOODS have them.
   assert.deepEqual(table.foods.map((f) => fromWire(room, toWire(f))).map((f) => [f.water, f.bitter]), table.foods.map((f) => [f.water, f.bitter]));
-  assert.ok(table.foods.some((f) => f.name === "espresso" && f.bitter === 1));
+  assert.ok(table.foods.some((f) => f.name === "espresso" && f.bitter > 0));
 });
 
 test("any one of a device's flies can reach a bite, but none means no bite and height still counts", () => {

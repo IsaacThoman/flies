@@ -3,10 +3,10 @@
 // phone (navigator.vibrate). A tick when food is dropped and a softer one when
 // it lands, a swell as the ball dives, two quick knocks when a press can't do
 // anything, the feather's brushing while it is on the fly, the air while you
-// blow, and a knock when the fly takes off. It is the player's: nothing here
-// reaches the fly. Where there is nothing to rumble (the Apple TV's remote, a
-// mouse, a keyboard, a phone without vibrate, whose own app plays haptics of
-// its own) it does nothing. Settings → Picture → Rumble turns it off.
+// blow, a knock when the fly takes off, and a click as a photo is taken. It
+// is the player's: nothing here reaches the fly. Where there is nothing to
+// rumble (the Apple TV's remote, a mouse, a keyboard, a phone without
+// vibrate, whose own app plays haptics of its own) it does nothing. Settings → Picture → Rumble turns it off.
 
 import type { Device } from "./input.ts";
 
@@ -14,7 +14,7 @@ type DualRumble = { startDelay: number; duration: number; weakMagnitude: number;
 type PadLike = { connected: boolean; vibrationActuator?: { playEffect?: (type: "dual-rumble", params: DualRumble) => Promise<unknown> } | null };
 type Vibrate = (pattern: number | number[]) => boolean;
 
-export type Feel = "drop" | "land" | "swoop" | "blocked" | "takeoff";
+export type Feel = "drop" | "land" | "swoop" | "blocked" | "takeoff" | "shutter";
 
 /** Each one-off feel: the pad's low (strong) and high (weak) motors, 0 to 1, for how long (ms), twice if `again` (ms after the first starts). A phone vibrates for the same time. */
 export const FEELS: Readonly<Record<Feel, { strong: number; weak: number; ms: number; again?: number }>> = {
@@ -23,6 +23,7 @@ export const FEELS: Readonly<Record<Feel, { strong: number; weak: number; ms: nu
   swoop: { strong: 0.35, weak: 0.3, ms: 260 },
   blocked: { strong: 0.25, weak: 0, ms: 35, again: 90 },
   takeoff: { strong: 0.6, weak: 0.2, ms: 70 },
+  shutter: { strong: 0.15, weak: 0.3, ms: 25 },
 };
 
 /** A held tool is felt as short pulses this often (ms), each a little longer, so they run together on a pad and brush on a phone. */

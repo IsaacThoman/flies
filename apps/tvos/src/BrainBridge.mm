@@ -15,6 +15,7 @@
 #import "BrainBridge.h"
 #import "JSHost.h"
 #include "fly_brain.h"
+#include <cmath>
 #include <condition_variable>
 #include <memory>
 #include <pthread.h>
@@ -22,13 +23,20 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 29, kCommands = 8, kStats = 4;
+constexpr int kScalars = 43, kCommands = 8, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
 // And thirst, which is 1 the same way.
 constexpr int kThirst = 18;
 // Where the wings' own beat is; a game that sends fewer has its wings folded, 0.
 constexpr int kWingbeat = 10;
+// Where the temperature at each antenna is; a game that sends fewer feels none, NaN.
+constexpr int kTemperatureLeft = 19, kTemperatureRight = 20;
+// Where touch where it lands starts, FLY_TOUCH_PARTS of it; a game that sends fewer is touched nowhere but by `touch`, 0.
+constexpr int kTouchParts = 21;
+// Then each odorant at the left antenna and the right (ODORANTS in packages/brain/src/olfaction.ts).
+constexpr int kOdor = kTouchParts + FLY_TOUCH_PARTS, kOdorants = 5;
+static_assert(kOdor + 2 * kOdorants == kScalars, "the odours are the last scalars");
 enum Status { kLoading, kRunning, kFailed };
 
 struct BrainHost {
@@ -134,10 +142,11 @@ void *Run(void *arg) {
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
       eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger], scalars[kWingbeat],
-      scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst],
-      {scalars[19], scalars[20], scalars[21], scalars[22], scalars[23]},
-      {scalars[24], scalars[25], scalars[26], scalars[27], scalars[28]},
+      scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst], scalars[kTemperatureLeft], scalars[kTemperatureRight], {},
     };
+    std::copy(scalars + kTouchParts, scalars + kTouchParts + FLY_TOUCH_PARTS, senses.touch_parts);
+    std::copy(scalars + kOdor, scalars + kOdor + kOdorants, senses.odor_left);
+    std::copy(scalars + kOdor + kOdorants, scalars + kOdor + 2 * kOdorants, senses.odor_right);
     fly_command c = {};
     fly_stats stats = {};
     char message[512] = "";
@@ -243,6 +252,7 @@ NATIVE(B_submit) {
     std::fill(b.scalars, b.scalars + kScalars, 0.f);
     b.scalars[kHunger] = 1.f;
     b.scalars[kThirst] = 1.f;
+    b.scalars[kTemperatureLeft] = b.scalars[kTemperatureRight] = NAN;
     if (scalars) std::copy(scalars, scalars + std::min<size_t>(ns, kScalars), b.scalars);
     b.eyesOpen = left && right && b.facets[0] && b.facets[1];
     if (b.eyesOpen) {

@@ -15,6 +15,7 @@
 // moving round with them (ui/corners.ts); or, on a screen too narrow for
 // that, under them, where there is more room.
 
+import { TOUCH_SENSES } from "@fly/brain";
 import type { BrainSenses, BrainState } from "@fly/brain";
 import * as THREE from "three";
 import { font, glassPanel, roundedRect, text } from "@fly/ui";
@@ -45,8 +46,8 @@ export const REDRAWS = 4;
 const VALUE = { size: 18, color: "#ffffff" };
 const UNIT = { size: 14, color: "#e4f3ff" };
 
-/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out. */
-const SENSES = [
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out; touch, the most any part of it is touched. */
+export const SENSES = [
   ["loomLeft", "Loom L"],
   ["loomRight", "Loom R"],
   ["touch", "Touch"],
@@ -64,7 +65,7 @@ const SENSES = [
   ["thirst", "Thirst"],
 ] as const;
 /** What comes out, and the neurons each is read from, by their rates' names in stats.rates. */
-const COMMANDS = [
+export const COMMANDS = [
   { key: "walk", label: "Walk", rates: ["DNg100"] },
   { key: "turn", label: "Steer", rates: ["DNa02 left", "DNa02 right"] },
   { key: "back", label: "Back up", rates: ["MDN"] },
@@ -79,21 +80,21 @@ const RATES = COMMANDS.reduce((n, c) => n + c.rates.length, 0);
 export const SIGNALS = SENSES.length + COMMANDS.length + RATES;
 
 /** In and out: a heading per column, then sense/command names, bars and actual readout rates. */
-const SUB = 13;
+export const SUB = 13;
 // 11, so that the eight commands still show big enough to read on a small phone on its side.
-const ROW = 11;
-const NAME = { in: 50, out: 42 };
-const BAR = { width: 44, height: 5 };
-const HZ = 36;
+export const ROW = 11;
+export const NAME = { in: 50, out: 42 };
+export const BAR = { width: 44, height: 5 };
+export const HZ = 36;
 const IN_WIDTH = NAME.in + BAR.width;
 const OUT_WIDTH = NAME.out + BAR.width + HZ;
-const IN_COLOR = "#9fffd8";
-const OUT_COLOR = "#ffd59a";
-const IN_HEADING = { size: 10, color: IN_COLOR };
-const OUT_HEADING = { size: 10, color: OUT_COLOR };
-const RATE = { size: 9, color: "#ffffff", align: "right" as const };
-const SIGNAL_LABEL = { size: 10, color: "#e4f3ff" };
-const HZ_UNIT = { ...SIGNAL_LABEL, align: "right" as const };
+export const IN_COLOR = "#9fffd8";
+export const OUT_COLOR = "#ffd59a";
+export const IN_HEADING = { size: 10, color: IN_COLOR };
+export const OUT_HEADING = { size: 10, color: OUT_COLOR };
+export const RATE = { size: 9, color: "#ffffff", align: "right" as const };
+export const SIGNAL_LABEL = { size: 10, color: "#e4f3ff" };
+export const HZ_UNIT = { ...SIGNAL_LABEL, align: "right" as const };
 /** Between its columns. */
 const APART = 14;
 
@@ -286,13 +287,20 @@ export function duration(seconds: number) {
 }
 
 /** How bright the world is to its eyes: the mean over every facet, 0 with them shut. */
-function meanLight(light: BrainSenses["light"]) {
+export function meanLight(light: BrainSenses["light"]) {
   if (!light) return 0;
   let sum = 0;
   for (let i = 0; i < light.left.length; i++) sum += light.left[i];
   for (let i = 0; i < light.right.length; i++) sum += light.right[i];
   const n = light.left.length + light.right.length;
   return n > 0 ? sum / n : 0;
+}
+
+/** The most any part of it is touched, as the brain is told: each part feels the stronger of its own touch and `touch`, all of it at once. */
+function touchOf(sensed: BrainSenses) {
+  let most = sensed.touch;
+  for (let k = 0; k < TOUCH_SENSES.length; k++) most = Math.max(most, sensed[TOUCH_SENSES[k]] ?? 0);
+  return most;
 }
 
 /** A bar's length in whole design units of its width: the steps it is drawn in, so only a change that shows counts. */
@@ -304,7 +312,9 @@ export function readSignals(s: StatsState, out: Float32Array) {
   let i = 0;
   for (let k = 0; k < SENSES.length; k++) {
     const key = SENSES[k][0];
-    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : sensed[key]);
+    out[i++] = step(
+      key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : key === "touch" ? touchOf(sensed) : sensed[key],
+    );
   }
   const command = s.brain?.command;
   for (let k = 0; k < COMMANDS.length; k++) out[i++] = command ? step(command[COMMANDS[k].key]) : 0;
@@ -314,7 +324,7 @@ export function readSignals(s: StatsState, out: Float32Array) {
 }
 
 /** A bar in a dark well, `v` of it lit; a signed one from its middle. */
-function bar(g: CanvasRenderingContext2D, x: number, y: number, v: number, color: string, signed: boolean) {
+export function bar(g: CanvasRenderingContext2D, x: number, y: number, v: number, color: string, signed: boolean) {
   const { width: w, height: h } = BAR;
   roundedRect(g, x, y, w, h, h / 2);
   g.fillStyle = "rgba(0, 16, 50, 0.5)";
@@ -409,7 +419,7 @@ export function drawStatsPanel(g: CanvasRenderingContext2D, shape: StatsShape, s
   }
 }
 
-const STATS_VS = /* glsl */ `
+export const STATS_VS = /* glsl */ `
 uniform vec2 origin;
 uniform vec2 panelSize;
 uniform vec2 frame;
@@ -420,7 +430,7 @@ void main() {
   vUv = vec2(position.x, 1.0 - position.y);
 }`;
 
-const STATS_FS = /* glsl */ `
+export const STATS_FS = /* glsl */ `
 uniform sampler2D panel;
 uniform float alpha;
 varying vec2 vUv;

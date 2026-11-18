@@ -21,6 +21,7 @@
 #include "olfaction.hpp"
 #include "sim.hpp"
 #include "state.hpp"
+#include "thermo.hpp"
 #include "vision.hpp"
 
 namespace fly {
@@ -84,6 +85,8 @@ class Brain {
 
   const Simulation& sim() const { return sim_; }
   const InternalState& state() const { return state_; }
+  /** What that antenna's thermoreceptors have adapted to, °C; NaN while it feels no temperature. */
+  double adapted(io::Side side) const { return thermoreceptors_.adapted(side); }
   const Modulation& modulation() const { return modulation_; }
 
  private:
@@ -97,12 +100,23 @@ class Brain {
   std::vector<olfaction::Group> smell_;
   std::vector<uint32_t> smell_inputs_;
   std::vector<uint32_t> sense_inputs_;
+  // For each group of touch regions (by its place in wiring_.senses): each neuron's rate, and each region's last set.
+  struct Regional {
+    size_t group;
+    std::vector<double> rates;
+    std::vector<double> felt;
+  };
+  std::vector<Regional> regional_;
+  void touch(Regional& regional, const io::Senses& senses);
   std::vector<uint32_t> background_inputs_;
   // The water neurons' output gain, which thirst sets (io::water_output_gain).
   uint32_t water_gain_ = 0;
   std::vector<std::pair<uint32_t, uint32_t>> release_;
   uint32_t modulated_ = 0;
   std::vector<uint32_t> state_inputs_;
+  // Each antenna's heating and cooling cells, in wiring_.thermo's order, and what they have adapted to.
+  std::vector<uint32_t> thermo_inputs_;
+  thermo::Thermoreceptors thermoreceptors_;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;
   std::vector<uint32_t> counts_;

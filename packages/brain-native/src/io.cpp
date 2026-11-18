@@ -75,6 +75,78 @@ const std::vector<uint32_t> kForelegMaleTaste = {
 constexpr const char* kLegCampaniform = "SNpp53";
 constexpr double kWingbeatRate = 100;
 
+// Touch lands somewhere: each part of the body's bristles is its own sense
+// (io.ts's HEAD_TOUCH and BODY_TOUCH say why each is what it is).
+std::vector<TouchRegion> head_touch() {
+  struct Part {
+    Sense left, right;
+    const char* name;
+    const char* description;
+    std::initializer_list<const char*> types;
+  };
+  const Part parts[] = {
+      {kTouchEyeLeft, kTouchEyeRight, "Eye", "the compound eye's interommatidial bristles (BM_InOm)", {"BM_InOm"}},
+      {kTouchFrontLeft, kTouchFrontRight, "Front",
+       "the bristles that enter by the antennal nerve (BM): the antenna's, and the front and top of the head's between the eyes", {"BM"}},
+      {kTouchOcciputLeft, kTouchOcciputRight, "Occiput", "the back of the head's: the occiput's and behind the eye (BM_vOcci_vPoOr, BM_Vt_PoOc)",
+       {"BM_vOcci_vPoOr", "BM_Vt_PoOc"}},
+      {kTouchMouthpartsLeft, kTouchMouthpartsRight, "Mouthparts",
+       "under the head: the proboscis', maxillary palps', vibrissae's and haustellum's (BM_Taste, BM_MaPa, BM_Vib, BM_Hau)",
+       {"BM_Taste", "BM_MaPa", "BM_Vib", "BM_Hau"}},
+  };
+  std::vector<TouchRegion> out;
+  for (const Part& part : parts) {
+    for (Side side : {kLeft, kRight}) {
+      out.push_back({side == kLeft ? part.left : part.right, std::string("touch") + part.name + (side == kLeft ? "Left" : "Right"),
+                     std::string(side == kLeft ? "Left: " : "Right: ") + part.description,
+                     sided(query({{kSuperClass, is("cb_sensory")}, {kType, one_of(part.types)}}), side)});
+    }
+  }
+  return out;
+}
+
+bool notum_type(std::string_view t) { return t == "SNta02" || t == "SNta05" || t == "SNta10" || t == "SNta12" || t == "SNta13" || t == "SNta33"; }
+bool wing_type(std::string_view t) {
+  return t == "SNta04" || t == "SNta06" || t == "SNta07" || t == "SNta11" || t == "SNta14" || t == "SNta18" || t == "SNta03";
+}
+
+std::vector<TouchRegion> body_touch() {
+  return {
+      {kTouchNotum, "touchNotum", "The notum's bristles (SNta02, SNta05, SNta10, SNta12, SNta13, SNta33)", query({{kSuperClass, is("vnc_sensory")}, {kType, notum_type}})},
+      {kTouchWings, "touchWings", "The wings' margins' and the halteres' bristles (SNta04, SNta06, SNta07, SNta11, SNta14, SNta18, SNta03)",
+       query({{kSuperClass, is("vnc_sensory")}, {kType, wing_type}})},
+      {kTouchAbdomen, "touchAbdomen", "The abdominal nerves' sensory neurons of no known modality, its bristles among them",
+       query({{kSuperClass, one_of({"vnc_sensory", "sensory_ascending"})}, {kClass, is("unknown_sensory")}, {kSubClass, is("abdomen")}})},
+      {kTouchLegs, "touchLegs", "The legs' tactile neurons: every other tactile neuron of the cord",
+       query({{kSuperClass, is("vnc_sensory")},
+              {kClass, is("mechanosensory_tactile")},
+              {kType, [](std::string_view t) { return !notum_type(t) && !wing_type(t); }}})},
+  };
+}
+
+// A bristle neuron's mean rate over half a second of deflection (io.ts's BRISTLE_RATE).
+constexpr double kBristleRate = 50;
+
+/** A group of regions: their neurons, region after region (io.ts's regional: an empty region is left empty); throws if a region's neuron is outside the group or in another region too. */
+Group regional(const Connectome& c, InputSpec spec) {
+  const std::vector<uint32_t> group = c.find(spec.select);
+  const std::unordered_set<uint32_t> within(group.begin(), group.end());
+  std::unordered_set<uint32_t> seen;
+  std::vector<uint32_t> neurons;
+  std::vector<uint32_t> ends;
+  for (const TouchRegion& region : spec.regions) {
+    const std::string& name = region.name;
+    for (uint32_t i : c.find(region.select)) {
+      if (within.count(i) == 0) throw std::runtime_error("Neuron " + std::to_string(i) + " of \"" + name + "\" is outside \"" + spec.name + "\"");
+      if (!seen.insert(i).second) throw std::runtime_error("Neuron " + std::to_string(i) + " of \"" + name + "\" is in another region of \"" + spec.name + "\" too");
+      neurons.push_back(i);
+    }
+    ends.push_back(static_cast<uint32_t>(neurons.size()));
+  }
+  const double rate = spec.max_rate;
+  return {std::move(spec), std::move(neurons), rate, std::move(ends)};
+}
+
 uint64_t output_synapses(const Connectome& c, const std::vector<uint32_t>& neurons) {
   uint64_t total = 0;
   for (uint32_t i : neurons) {
@@ -96,10 +168,11 @@ std::vector<InputSpec> senses() {
   return {
       {"loomLeft", "Looming detectors (LPLC2, LC4) of the left eye", sided(kLooming, kLeft), 100, "", kLoomLeft, kLeft},
       {"loomRight", "Looming detectors (LPLC2, LC4) of the right eye", sided(kLooming, kRight), 100, "", kLoomRight, kLeft},
-      {"touch head", "Mechanosensory bristle neurons of the head (BM types)", query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("BM")}}), 50,
-       "", kTouch, kLeft, {}, false, true},
-      {"touch body", "Mechanosensory bristle neurons of the thorax, abdomen and legs",
-       query({{kSuperClass, is("vnc_sensory")}, {kSubClass, is("mechanosensory_bristle")}}), 10, "", kTouch, kLeft, {}, false, true},
+      {"touch head", "Mechanosensory bristle neurons of the head (BM types), by part and side", query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("BM")}}),
+       kBristleRate, "", kTouch, kLeft, {}, false, true, head_touch()},
+      {"touch body", "Mechanosensory bristle neurons of the notum, wings and halteres, abdomen and legs",
+       query({{kSuperClass, one_of({"vnc_sensory", "sensory_ascending"})}, {kClass, one_of({"mechanosensory_tactile", "unknown_sensory"})}}), kBristleRate, "",
+       kTouch, kLeft, {}, false, true, body_touch()},
       {"bumpLeft", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna", sided(kAntenna, kLeft), 100, "", kBumpLeft, kLeft, {}, false, true},
       {"bumpRight", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the right antenna", sided(kAntenna, kRight), 100, "", kBumpRight,
        kLeft, {}, false, true},
@@ -152,6 +225,20 @@ std::vector<StateSpec> state_inputs() {
   };
 }
 
+// The aristae's heating and cooling cells (io.ts's THERMO_INPUTS says why these).
+std::vector<ThermoSpec> thermo_inputs() {
+  std::vector<ThermoSpec> out;
+  for (Side side : {kLeft, kRight}) {
+    const std::string name = side == kLeft ? "left" : "right";
+    out.push_back({"heating " + name, "Heating cells (Gr28b.d) of the " + name + " arista, TRN_VP2",
+                   query({{kSuperClass, is("cb_sensory")}, {kClass, is("thermosensory")}, {kType, is("TRN_VP2")}, {kSide, is(name)}}), side, true});
+    out.push_back({"cooling " + name, "Cooling cells (Ir21a) of the " + name + " arista, TRN_VP3a and TRN_VP3b",
+                   query({{kSuperClass, is("cb_sensory")}, {kClass, is("thermosensory")}, {kType, one_of({"TRN_VP3a", "TRN_VP3b"})}, {kSide, is(name)}}), side,
+                   false});
+  }
+  return out;
+}
+
 std::vector<ReadoutSpec> readouts() {
   return {
       {"DNg100", "BDN2, forward walking", query({{kType, is("DNg100")}}), 150},
@@ -169,6 +256,10 @@ std::vector<ReadoutSpec> readouts() {
 Wiring wire(const Connectome& c) {
   Wiring w;
   for (InputSpec& spec : senses()) {
+    if (!spec.regions.empty()) {
+      w.senses.push_back(regional(c, std::move(spec)));
+      continue;
+    }
     std::vector<uint32_t> neurons = c.find(spec.select);
     if (!spec.root_ids.empty()) {
       const std::unordered_set<uint32_t> wanted(spec.root_ids.begin(), spec.root_ids.end());
@@ -197,6 +288,10 @@ Wiring wire(const Connectome& c) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     if (!neurons.empty()) w.state.push_back({std::move(spec), std::move(neurons)});
   }
+  for (ThermoSpec& spec : thermo_inputs()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    if (!neurons.empty()) w.thermo.push_back({std::move(spec), std::move(neurons)});
+  }
   NeuronQuery sleepy{};
   sleepy[kType] = dfb_sleep;
   auto excitable = c.find(sleepy);
@@ -221,6 +316,7 @@ Wiring wire(const Connectome& c) {
     for (const Group& group : *groups) driven.insert(group.neurons.begin(), group.neurons.end());
   }
   for (const StateGroup& group : w.state) driven.insert(group.neurons.begin(), group.neurons.end());
+  for (const ThermoGroup& group : w.thermo) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const auto& group : w.excitability) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ReadoutGroup& group : w.readouts) {
     for (uint32_t i : group.neurons) {
@@ -245,8 +341,14 @@ double intensity(const Senses& s, Sense sense) {
     case kBitter: return js::clamp(s.bitter, 0, 1);
     case kWater: return js::clamp(s.water, 0, 1);
     case kSenseCount: break;
+    default: return js::clamp(s.touch_parts[sense - kTouchEyeLeft], 0, 1);
   }
   return 0;
+}
+
+double region_rate(const Group& group, size_t r, const Senses& s) {
+  const double felt = js::max(intensity(s, group.spec.sense), intensity(s, group.spec.regions[r].sense));
+  return group.max_rate * felt * (group.spec.gated ? sleep_gate(s) : 1);
 }
 
 double hunger_of(const Senses& s) { return std::isfinite(s.hunger) ? js::min(1, js::max(0, s.hunger)) : 1; }

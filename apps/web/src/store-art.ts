@@ -2,6 +2,7 @@
 // No requestAnimationFrame, worker timing, invented commands or synthetic region rates.
 import { REGION_RATE_NAMES } from "@fly/brain";
 import type { Brain, BrainSenses, BrainState } from "@fly/brain";
+import { Contacts } from "@fly/body";
 import { WasmBrainModule } from "@fly/brain-native";
 import type { BrainDriver, TableSocket } from "@fly/contracts";
 import type { TableStart } from "@fly/net";
@@ -122,7 +123,7 @@ async function capture(story: StoreStory, tv = false) {
     games.forEach((g, i) => {
       const host: TableHost = {
         scene: g.stage.scene, stage: g.stage, life: g.life, company: g.company, others: g.others, hands: g.hands, fly: g.fly, eyes: g.eyes, bubbles: g.bubbles,
-        felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
+        felt: { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] },
         // One fly each: the picture is of three devices' flies together.
         flies: () => 1, seat: () => {}, share: (pantry) => g.life.share(pantry),
         here: () => g.here, moving: () => false, moveTo: id => g.moveTo(id),

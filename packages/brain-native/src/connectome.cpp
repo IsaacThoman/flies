@@ -162,6 +162,10 @@ Connectome::Connectome(const uint8_t* data, size_t length) {
     tables_[c].reserve(size);
     for (uint32_t item : table->items) tables_[c].push_back(doc.at(item).string);
   }
+  for (int c = 0; c < kCategories; c++) {
+    code_counts_[c].assign(tables_[c].size(), 0);
+    for (uint32_t i = 0; i < neurons_; i++) code_counts_[c][code(static_cast<Category>(c), i)]++;
+  }
 }
 
 int64_t Connectome::index_of(uint32_t id) const {
@@ -179,20 +183,42 @@ int64_t Connectome::index_of(uint32_t id) const {
 }
 
 std::vector<uint32_t> Connectome::find(const NeuronQuery& query) const {
-  // Each condition is resolved once per table entry, then neurons are matched by code.
-  std::vector<std::pair<Category, std::vector<uint8_t>>> masks;
+  // Each condition is resolved once per table entry. One pass over the column
+  // of the condition that fewest neurons meet gathers them, and the other
+  // conditions narrow what it gathered: a brain asks some sixty queries.
+  struct Mask {
+    Category column;
+    std::vector<uint8_t> mask;
+    size_t size;
+  };
+  std::vector<Mask> masks;
   for (int c = 0; c < kCategories; c++) {
     if (!query[c]) continue;
-    std::vector<uint8_t> mask;
-    mask.reserve(tables_[c].size());
-    for (const std::string& value : tables_[c]) mask.push_back(query[c](value) ? 1 : 0);
-    masks.emplace_back(static_cast<Category>(c), std::move(mask));
+    Mask m{static_cast<Category>(c), std::vector<uint8_t>(tables_[c].size(), 0), 0};
+    for (size_t k = 0; k < tables_[c].size(); k++) {
+      if (!query[c](tables_[c][k])) continue;
+      m.mask[k] = 1;
+      m.size += code_counts_[c][k];
+    }
+    masks.push_back(std::move(m));
   }
   std::vector<uint32_t> out;
+  if (masks.empty()) {
+    out.resize(neurons_);
+    for (uint32_t i = 0; i < neurons_; i++) out[i] = i;
+    return out;
+  }
+  const Mask* narrowest = &masks[0];
+  for (const Mask& m : masks) {
+    if (m.size < narrowest->size) narrowest = &m;
+  }
+  out.reserve(narrowest->size);
   for (uint32_t i = 0; i < neurons_; i++) {
-    bool all = true;
-    for (const auto& [column, mask] : masks) all = all && mask[code(column, i)] == 1;
-    if (all) out.push_back(i);
+    if (narrowest->mask[code(narrowest->column, i)] != 0) out.push_back(i);
+  }
+  for (const Mask& m : masks) {
+    if (&m == narrowest) continue;
+    std::erase_if(out, [&](uint32_t i) { return m.mask[code(m.column, i)] == 0; });
   }
   return out;
 }

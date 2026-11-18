@@ -12,9 +12,10 @@
 // this one a minute.
 //
 // The air's humidity isn't modelled: it is always the dry air those flies were
-// kept in. Nor is the water in what it eats. Juice and fruit are mostly water,
-// but foods say only how sweet they are and how much plain water they are,
-// not how much water they hold, so only plain water quenches it.
+// kept in. Nor, as such, is the water in what it eats: foods say how strongly
+// the water-sensing neurons answer them (@fly/world's tastes.ts), not how much
+// water they hold, and that answer stands in for it, so a dilute juice
+// quenches nearly as plain water does and a syrup not at all.
 
 export const THIRST = {
   /**

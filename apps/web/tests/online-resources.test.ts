@@ -152,27 +152,27 @@ test("online clears wait for the room: rejected falling food still lands; accept
   update();
   update();
   assert.ok(online.joined);
-  const use = (kind: number) => {
-    hands.variants[0] = kind;
+  const use = (kind: "sugar" | "clear") => {
+    hands.variants[0] = hands.current.variants.findIndex((v) => v.id === kind);
     hands.update(0, { use: true, holding: true, eye: camera.position }, body, online.pantry);
     update();
     hands.clearEvents();
   };
-  for (let i = 0; i < 6; i++) use(0);
+  for (let i = 0; i < 6; i++) use("sugar");
   assert.equal(hands.falling.length, 6);
-  use(4);
+  use("clear");
   assert.equal(hands.falling.length, 6, "rate-limited clear preserves the pending offerings");
   hands.update(0.3, { use: false, holding: false, eye: camera.position }, body, online.pantry);
   assert.equal(online.pantry.foods.filter((f) => f.kind === "sugar").length, 6, "rejected clear still lands locally");
   clock.now += 4000;
-  use(4);
+  use("clear");
   table.tick();
   update();
   assert.ok(!online.pantry.foods.some((f) => f.kind === "sugar"), "accepted removal arrives through food.gone");
   clock.now += 4000;
-  use(0);
+  use("sugar");
   assert.equal(hands.falling.length, 1);
-  use(4);
+  use("clear");
   table.tick();
   update();
   assert.equal(hands.falling.length, 0, "accepted clear cancels the exact pending fall");

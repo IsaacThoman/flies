@@ -35,6 +35,9 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
     meter: { history: new Float32Array(120), head: 0, spikesPerSecond: 0, active: 0, speed: 1 } as unknown as Shell["meter"],
     life: { sensed: { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, light: null }, activity: "resting" } as unknown as Shell["life"],
+    journal: null,
+    canSavePictures: false,
+    savePicture: async () => "failed",
     weatherOutside: false,
     weatherAttribution: () => null,
     shape: frame,
@@ -68,9 +71,10 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.equal(hud.cx, 427);
   assert.equal(hud.captionY, 25);
   assert.equal(hud.shelfY, 446);
-  assert.equal(hud.gap, 52);
-  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [203, TOOLS.findIndex((t) => t.world), 32]);
-  assert.equal(hud.orb, 1);
+  // Ten tools come closer than eight did, keeping the shelf as wide as it was, clear of the bottom corners; the one in hand's orb a little smaller to fit.
+  assert.equal(hud.gap, 41);
+  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [206, TOOLS.findIndex((t) => t.world), 32]);
+  assert.ok(Math.abs(hud.orb - 19.5 / 22) < 1e-9, String(hud.orb));
   assert.equal(hud.labelY, 385);
   assert.deepEqual([hud.hintsX, hud.hintsY, hud.rightX, hud.rightY, hud.menuX, hud.menuY], [16, 446, 838, 446, 16, 24]);
   const p = hud.picture;
@@ -141,7 +145,7 @@ test("a shelf of ten tools in its two groups fits every shape: one row where a f
   const phone = frames().find(([name]) => name === "a phone upright")![1];
   const stacked = hudLayout(phone, true, ten);
   assert.ok(stacked.toolY[0] < stacked.toolY[9], "the fly's tools over its world's");
-  // Today's shelf of eight: one row on the TV and wherever each tool takes a finger in one, else the fly's tools over its world's.
+  // Today's shelf of ten: one row on the TV and wherever each tool takes a finger in one, else the fly's tools over its world's.
   assert.equal(new Set(hudLayout(TV_FRAME).toolY).size, 1);
   for (const [name, frame] of frames()) {
     const hud = hudLayout(frame);

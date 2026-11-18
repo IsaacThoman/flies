@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
+import { Contacts } from "@fly/body";
 import type { BrainDriver, TableSocket } from "@fly/contracts";
 import { AWAY, HANDS, HOLDING, TABLETOP_SCALE, createFlyState, encodeFlies } from "@fly/net";
 import { World } from "@fly/world";
@@ -8,7 +9,7 @@ import { Life } from "../src/life.ts";
 import { Online } from "../src/online/online.ts";
 import { OtherFlies } from "../src/online/others.ts";
 import type { TableHost } from "../src/online/online.ts";
-import { Hands, TOOLS } from "../src/tools/hands.ts";
+import { Hands, TOOLS, toolToWire } from "../src/tools/hands.ts";
 
 const gradient = { addColorStop() {} };
 const context = new Proxy({}, { get: () => () => gradient });
@@ -24,7 +25,7 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     const scene = new THREE.Scene();
     const host = {
       scene, life, company: { list: [] }, others: new OtherFlies(scene, world), hands: new Hands(world), eyes: { see() {} }, stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } },
-      bubbles: { table: null }, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, flies: () => 1, seat() {}, share() {},
+      bubbles: { table: null }, felt: { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] }, flies: () => 1, seat() {}, share() {},
     } as unknown as TableHost;
     const socket: TableSocket = { status: "connecting", closeCode: 0, closeReason: "", send() {}, drain() {}, close() {} };
     const online = new Online(host, () => socket, "ws://test", "abcdefghjk", "key", null);
@@ -34,7 +35,7 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     state.id = 2;
     state.t = now;
     state.flags = HANDS | HOLDING;
-    state.hand.tool = TOOLS.findIndex((toolSpec) => toolSpec.id === tool);
+    state.hand.tool = toolToWire(TOOLS.findIndex((toolSpec) => toolSpec.id === tool));
     state.hand.eyeZ = -10;
     const batch = new DataView(new ArrayBuffer(100));
     const hear = () => { const n = encodeFlies(batch, TABLETOP_SCALE, [state]); online.line.onFlies(new DataView(batch.buffer, 0, n)); };
@@ -45,7 +46,13 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
       online.others.update(online.line.clock.now(now), 0.02, camera.position, 480, life.body);
       online.update(0.02, camera, now / 1000, () => 0);
     };
-    const stimulus = () => tool === "feather" ? online.stroke : Math.hypot(online.air.x, online.air.y, online.air.z);
+    const contacts = new Contacts();
+    const feather = () => {
+      contacts.clear();
+      online.touch(life.body, contacts);
+      return contacts.strongest;
+    };
+    const stimulus = () => tool === "feather" ? feather() : Math.hypot(online.air.x, online.air.y, online.air.z);
     step(); hear(); step();
     assert.ok(stimulus() > 0, "the live tool acts first");
     online.line.onMessage({ type: "drop", by: 2, id: 2000001, kind: "sugar", x: 10, z: 0, y: 0, at: now });

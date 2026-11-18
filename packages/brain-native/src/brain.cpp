@@ -1,5 +1,6 @@
 #include "brain.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <stdexcept>
 #include <string_view>
@@ -22,7 +23,15 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
       modulation_(connectome, wiring_) {
   sense_inputs_.assign(wiring_.senses.size(), 0);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
-    if (!wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
+    const io::Group& group = wiring_.senses[k];
+    if (group.spec.after_eyes) continue;
+    if (group.ends.empty()) {
+      sense_inputs_[k] = sim_.add_input(group.spec.name, group.neurons);
+      continue;
+    }
+    // A rate for each region: one input still, so every later input's stream is where it was.
+    sense_inputs_[k] = sim_.add_rated_input(group.spec.name, group.neurons);
+    regional_.push_back({k, std::vector<double>(group.neurons.size(), 0), std::vector<double>(group.ends.size(), 0)});
   }
   for (const io::Group& group : wiring_.background) background_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
   // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
@@ -95,7 +104,9 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (size_t side = 0; side < retinas_.size(); side++) {
     withdrawn_inputs_[side] = sim_.add_rated_input(std::string("eye ") + (side == io::kLeft ? "left" : "right") + " withdrawn", retinas_[side].l1(), true);
   }
-  // After the withdrawals, preserving all earlier inputs' streams.
+  // The thermoreceptors after even those: with no temperature felt, every stream is as it was before them.
+  for (const io::ThermoGroup& group : wiring_.thermo) thermo_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // The receptor neurons of smell after even those, so every earlier input's stream is as it was.
   smell_ = olfaction::wire(connectome);
   std::unordered_set<uint32_t> read;
   for (const auto& group : wiring_.readouts) read.insert(group.neurons.begin(), group.neurons.end());
@@ -126,8 +137,10 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   const double gate = io::sleep_gate(senses);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     const io::Group& group = wiring_.senses[k];
+    if (!group.ends.empty()) continue;
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
   }
+  for (Regional& regional : regional_) touch(regional, senses);
   const auto odor = olfaction::odor_of(senses);
   for (size_t k = 0; k < smell_.size(); k++) sim_.set_rate(smell_inputs_[k], olfaction::rate(smell_[k], odor));
   const double hunger = io::hunger_of(senses);
@@ -143,6 +156,7 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   state_.rest(js::max(io::state_of(senses, io::kClockMorning), io::state_of(senses, io::kClockEvening)), io::state_of(senses, io::kClockSleep),
               io::state_of(senses, io::kSleepPressure), io::state_of(senses, io::kSleepDepth));
   const double eye_gain = 1 - io::kSleepEyes * state_.sleepiness();
+  const double temperature[2] = {thermo::temperature_of(senses, io::kLeft), thermo::temperature_of(senses, io::kRight)};
   double left = dt_ms;
   while (left > 1e-9) {
     const double chunk = js::min(kChunkMs, left);
@@ -173,6 +187,13 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
       }
     }
     if (!retinas_.empty()) eye_gain_ = eye_gain;
+    for (io::Side side : {io::kLeft, io::kRight}) {
+      const thermo::Thermoreceptors::Rates rates = thermoreceptors_.step(side, temperature[side], chunk);
+      for (size_t k = 0; k < wiring_.thermo.size(); k++) {
+        const io::ThermoSpec& spec = wiring_.thermo[k].spec;
+        if (spec.side == side) sim_.set_rate(thermo_inputs_[k], spec.heating ? rates.heating : rates.cooling);
+      }
+    }
     const double before = sim_.time();
     sim_.advance(chunk);
     const double ran = sim_.time() - before;
@@ -203,6 +224,20 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   stats.spikes = sim_.spikes() - spikes_before;
   stats.active = sim_.active();
   return io::decode(rates_);
+}
+
+// Sets a group of regions' rates, where any region's has changed: setting them redraws the input's next spike, so only then.
+void Brain::touch(Regional& regional, const io::Senses& senses) {
+  const io::Group& group = wiring_.senses[regional.group];
+  bool changed = false;
+  for (size_t r = 0; r < group.ends.size(); r++) {
+    const double rate = io::region_rate(group, r, senses);
+    if (rate == regional.felt[r]) continue;
+    regional.felt[r] = rate;
+    changed = true;
+    std::fill(regional.rates.begin() + (r == 0 ? 0 : group.ends[r - 1]), regional.rates.begin() + group.ends[r], rate);
+  }
+  if (changed) sim_.set_rates(sense_inputs_[regional.group], regional.rates);
 }
 
 void Brain::modulate() {

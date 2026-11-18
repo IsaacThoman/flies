@@ -29,6 +29,7 @@ import { Fingers, canvasPoint, doubleClick, openGame, readState, screenOf, start
 
 import type { Game } from "../src/game.ts";
 import { FLY_MIDDLE, FLY_REACH } from "../src/tools/aim.ts";
+import { FEATHER_REACH, TOOLS } from "../src/tools/hands.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
@@ -103,6 +104,56 @@ async function airOf(page: Page): Promise<[number, number] | null> {
   return sky;
 }
 
+/** The spot on the table furthest from the fly, clear of the controls, if the feather put down there wouldn't reach it. */
+async function tableAway(page: Page): Promise<[number, number] | null> {
+  return game<[number, number] | null>(
+    page,
+    `(() => {
+      const c = g.director.camera;
+      const hit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
+      const { width, height } = g.shape.design;
+      const fly = g.life.body.position;
+      let best = null, furthest = 1.5 * ${FEATHER_REACH};
+      for (let y = 0.1; y < 0.9; y += 0.04) for (let x = 0.08; x < 0.95; x += 0.06) {
+        const d = new c.position.constructor(x * 2 - 1, 1 - y * 2, 0.5).unproject(c).sub(c.position).normalize();
+        if (!g.life.world.raycast(c.position, d, hit) || g.overlay.hits.at(x * width, y * height, 12)) continue;
+        const away = Math.hypot(hit.point.x - fly.x, hit.point.z - fly.z);
+        if (away > furthest) [best, furthest] = [[x, y], away];
+      }
+      return best;
+    })()`,
+  );
+}
+
+/**
+ * The frame the feather first strokes the fly: the parts it feels then, as data-touched writes them, and how far
+ * (mm, across the table) the feather is from the fly's middle, which it has walked from since the feather met it.
+ * A frame, not data-touched itself, which is written a few times a second: by then the fly may have walked out
+ * from under the finger.
+ */
+function firstStroke(page: Page) {
+  return page.evaluate(() => new Promise<{ touched: string; off: number }>((resolve, reject) => {
+    const g = (globalThis as unknown as { __fly: Game }).__fly;
+    let next = 0;
+    const timer = setTimeout(() => {
+      cancelAnimationFrame(next);
+      reject(new Error("the feather didn't stroke the fly within 60 s"));
+    }, 60_000);
+    const frame = () => {
+      if (!g.hands.stroking) {
+        next = requestAnimationFrame(frame);
+        return;
+      }
+      clearTimeout(timer);
+      const sensed = g.life.sensed as unknown as Record<string, number>;
+      const touched = Object.keys(sensed).filter((k) => /^touch[A-Z]/.test(k) && sensed[k] > 0).map((k) => `${k.slice(5)} ${sensed[k].toFixed(2)}`).join(" ");
+      const p = g.hands.pointer, fly = g.life.body.position;
+      resolve({ touched, off: Math.hypot(p.x - fly.x, p.z - fly.z) });
+    };
+    next = requestAnimationFrame(frame);
+  }));
+}
+
 /** Watches the frame's cost for as long as a page is open. */
 function budget(page: Page) {
   const seen = { calls: 0, triangles: 0 };
@@ -162,7 +213,13 @@ async function fingers() {
     );
 
     step("fingers: Clear dropped removes offerings without taking the place's food");
-    for (let i = 0; i < 3; i++) await tapOn("kind", 1);
+    // Along the kinds, one tap and one shown change at a time, to the last.
+    for (let i = 0; i < 12; i++) {
+      const at = (await readState(page)).variant;
+      if (at === "clear") break;
+      await tapOn("kind", 1);
+      await waitFor(page, `variant~^(?!${at}$)`);
+    }
     await waitFor(page, "variant=clear");
     const placeFoods = await game<number>(page, "g.life.pantry.foods.filter(f => f.kind === 'patch' || f.kind === 'found').length");
     await touch.tap(await screenOf(page, "hand"));
@@ -172,9 +229,21 @@ async function fingers() {
     });
     assert.equal(await game<number>(page, "g.life.pantry.foods.length"), placeFoods);
 
-    step("fingers: a finger held on the fly strokes it with the feather");
+    step("fingers: a finger held on the fly strokes it with the feather, on its back");
     await tool("feather");
-    await touch.hold(await screenOf(page, "fly"), () => waitFor(page, "touch>0.9"));
+    // The feather rests on whatever of the fly is under the hand, and a touch is still felt for a moment after
+    // it has gone (packages/body's senses): left following the fly, in front of its mouth, the feather is on its
+    // face, and its face still feels it on the frames after the finger lands on its back. So, as a player who
+    // means its back would, put it down away from the fly first, until the fly feels nothing.
+    const away = await tableAway(page);
+    assert.ok(away, "table to put the feather down on, away from the fly");
+    await touch.tap(away);
+    await waitFor(page, "touch=0.000,touched=");
+    const stroke = firstStroke(page);
+    await touch.hold(await screenOf(page, "fly"), async () => {
+      const { touched, off } = await stroke;
+      assert.ok(/Notum 1\.00/.test(touched) && !/Front/.test(touched), `stroked on its back, not its face: ${touched} (the feather ${off.toFixed(2)} mm from its middle)`);
+    });
 
     step("fingers: a finger held beside it blows");
     await tool("blow");
@@ -237,7 +306,7 @@ async function fingers() {
     // Outside the pane is Back.
     await touch.tap([0.5, 0.97]);
     await waitFor(page, "screen=title");
-    await tapOn("row", 4);
+    await tapOn("row", 5);
     await waitFor(page, "screen=about");
     await tapOn("notice", 0);
     await waitFor(page, "acknowledgement=0");
@@ -452,7 +521,8 @@ async function mouse() {
     await waitWithin(page, `view=follow,reach~^11\\.1$,yaw=${before}`, 15);
 
     step("keys: a number picks a tool, and the hints are a keyboard's");
-    await page.keyboard.press("2");
+    // The key for the feather is its place on the shelf, which grows as tools are added.
+    await page.keyboard.press(String(TOOLS.findIndex((t) => t.id === "feather") + 1));
     await waitFor(page, "tool=feather,device=keys");
     await page.keyboard.press("1");
     await waitFor(page, "tool=feed");

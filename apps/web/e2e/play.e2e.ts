@@ -20,7 +20,7 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { gameUp, openGame, readState, startServer, swipe, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
-import { dropFood, feedHoney } from "./feeding.ts";
+import { dropFood, feedHoney, refuseBitterSugar } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
 import { chooseFlies, companyAwake, companyOf, disableScreensaver } from "./settings.ts";
@@ -236,7 +236,7 @@ try {
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
-  await press("ArrowDown", 2);
+  await press("ArrowDown", 3);
   await press("Enter");
   await waitFor(page, "screen=about");
   await press("Enter");
@@ -250,7 +250,7 @@ try {
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");
-  await press("ArrowUp", 4);
+  await press("ArrowUp", 5);
   await waitFor(page, "focus=play");
 
   step("play: the fly is on the table, and its brain is moving it");
@@ -277,6 +277,16 @@ try {
   await waitForGameTime(page, 2);
   const printed = Number((await readState(page)).prints);
   console.log(printed > 0 ? `  walked off the honey, its feet printing (${printed} so far)` : "  no honey prints yet: walking is the brain's choice");
+
+  step("bitter: sugar spoiled with coffee at its mouth is tasted bitter, and the brain leaves it");
+  // Clear the honey first: on two foods as sweet, the one dropped first is the one tasted.
+  await press("ArrowDown", 5);
+  await waitFor(page, "tool=feed,variant=clear");
+  await press("Enter");
+  await waitFor(page, "food=0");
+  await press("ArrowUp");
+  await waitFor(page, "tool=feed,variant=laced");
+  await refuseBitterSugar(page, () => dropFood(page, () => press("Enter")));
 
   step("startle: the ball dives at it until it takes off (its brain decides; it doesn't every time)");
   await toTool("swoop");
@@ -375,10 +385,16 @@ try {
   // At rest its brain can be all but silent: the fly keeps the real time of day,
   // and in its siesta or at night it lies still with no region glowing. So it is
   // stroked with the feather, which its brain answers at any hour (a sleeping fly
-  // included), and the glow is read while the stroke goes on.
+  // included) when it strokes its face, where it rests following the fly, and
+  // the glow is read while the stroke goes on.
   await toTool("feather");
+  // Back to following the fly, at its face, wherever the steps before left the pointer.
+  await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.hands.release());
+  await waitFor(page, "pointer=following");
+  await waitForGameTime(page, 2);
   await page.keyboard.down("Enter");
-  await waitFor(page, "touch>0.9");
+  const stroked = await waitFor(page, "touch>0.9");
+  assert.ok(/FrontLeft 1\.00/.test(stroked.touched) && /FrontRight 1\.00/.test(stroked.touched), `the feather strokes its face: ${stroked.touched}`);
   const inside = await waitWithin(page, "glow~head-bristles|bristles", 10);
   await page.keyboard.up("Enter");
   console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);

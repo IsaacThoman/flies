@@ -44,8 +44,13 @@ export type InputSpec = {
 export const STATE_KEYS = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 export type StateKey = (typeof STATE_KEYS)[number];
 
-/** The senses that are one intensity each; `light` is a picture and `odor` a strength per odorant and antenna, handled apart, and `hunger`, `thirst` and the clock and sleep internal state, not senses. */
-export type ScalarSense = Exclude<keyof BrainSenses, "light" | "odor" | "hunger" | "thirst" | StateKey>;
+/**
+ * The senses that are one intensity each and drive a group of their own; `light` is a picture and `odor` a strength per odorant and antenna,
+ * handled apart (olfaction.ts), `hunger`, `thirst` and the
+ * clock and sleep internal state, not senses, the antennae's temperatures handled apart (thermo.ts), and the touch senses each drive a
+ * region of a group (`regions`).
+ */
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "odor" | "hunger" | "thirst" | StateKey | "temperatureLeft" | "temperatureRight" | TouchSense>;
 export type SenseSpec = InputSpec & {
   sense: ScalarSense;
   /**
@@ -53,10 +58,40 @@ export type SenseSpec = InputSpec & {
    * sleeps (SLEEP_GATE). The eyes and taste aren't gated.
    */
   gated?: boolean;
+  /**
+   * The parts of the body this group's neurons are of, each felt as its own
+   * sense: the group is their neurons, region after region, all within
+   * `select`, and each region fires at `maxRate` times the stronger of its
+   * own sense and the group's (`touch`, the whole body at once).
+   */
+  regions?: readonly TouchRegion[];
 };
+
+/** The touch senses that say where a touch lands. */
+export const TOUCH_SENSES = [
+  "touchEyeLeft",
+  "touchEyeRight",
+  "touchFrontLeft",
+  "touchFrontRight",
+  "touchOcciputLeft",
+  "touchOcciputRight",
+  "touchMouthpartsLeft",
+  "touchMouthpartsRight",
+  "touchNotum",
+  "touchWings",
+  "touchAbdomen",
+  "touchLegs",
+] as const satisfies readonly (keyof BrainSenses)[];
+export type TouchSense = (typeof TOUCH_SENSES)[number];
+
+/** One part of the body's mechanosensory bristles, touched as `sense` says. */
+export type TouchRegion = { sense: TouchSense; description: string; select: Selection };
 
 /** An input that stands for internal state the connectome can't supply, driving the real neurons that carry it. */
 export type StateSpec = InputSpec & { state: StateKey };
+
+/** One antenna's heating or cooling cells, whose rates thermo.ts works out from the temperature there (maxRate is unused: 0). */
+export type ThermoSpec = InputSpec & { side: "left" | "right"; cell: "heating" | "cooling" };
 
 export type ReadoutSpec = {
   /** Name in `stats.rates`. */
@@ -135,23 +170,81 @@ export const LEG_CAMPANIFORM = "SNpp53";
 // loop it closes with the body dies away the same (README, Senses).
 export const WINGBEAT_RATE = 100;
 
+// Touch lands somewhere: each part of the body's bristles is its own sense
+// (README, Senses). The head's are told apart by type, which FlyEM gives by
+// the nerve they enter by, and have a side. The body's types are each of one
+// nerve, so they are told apart by type too (`scripts/touch.ts` checks the
+// split against the anatomy file's entry nerves), but the packed wiring
+// doesn't say their side.
+const HEAD_PARTS: readonly { part: string; description: string; types: readonly string[] }[] = [
+  { part: "Eye", description: "the compound eye's interommatidial bristles (BM_InOm)", types: ["BM_InOm"] },
+  {
+    part: "Front",
+    description: "the bristles that enter by the antennal nerve (BM): the antenna's, and the front and top of the head's between the eyes",
+    types: ["BM"],
+  },
+  { part: "Occiput", description: "the back of the head's: the occiput's and behind the eye (BM_vOcci_vPoOr, BM_Vt_PoOc)", types: ["BM_vOcci_vPoOr", "BM_Vt_PoOc"] },
+  {
+    part: "Mouthparts",
+    description: "under the head: the proboscis', maxillary palps', vibrissae's and haustellum's (BM_Taste, BM_MaPa, BM_Vib, BM_Hau)",
+    types: ["BM_Taste", "BM_MaPa", "BM_Vib", "BM_Hau"],
+  },
+];
+export const HEAD_TOUCH: readonly TouchRegion[] = HEAD_PARTS.flatMap(({ part, description, types }) =>
+  (["left", "right"] as const).map((side) => ({
+    sense: `touch${part}${side === "left" ? "Left" : "Right"}` as TouchSense,
+    description: `${side === "left" ? "Left" : "Right"}: ${description}`,
+    select: { superClass: "cb_sensory", type: [...types], side },
+  })),
+);
+// The notum's microchaetae (SNta02) and macrochaetae (SNta05, 10, 12, 13), and
+// SNta33, by the posterior dorsal mesothoracic and dorsal prothoracic nerves.
+export const NOTUM_TYPES = ["SNta02", "SNta05", "SNta10", "SNta12", "SNta13", "SNta33"];
+// The wing margin's bristles (SNta04, 06, 07, 11, 14, 18; Marin et al. 2024),
+// by the anterior dorsal mesothoracic nerve, and the halteres' (SNta03), the
+// hind wings', by the dorsal metathoracic nerve.
+export const WING_TYPES = ["SNta04", "SNta06", "SNta07", "SNta11", "SNta14", "SNta18", "SNta03"];
+export const BODY_TOUCH: readonly TouchRegion[] = [
+  { sense: "touchNotum", description: `The notum's bristles (${NOTUM_TYPES.join(", ")})`, select: { superClass: "vnc_sensory", type: NOTUM_TYPES } },
+  { sense: "touchWings", description: `The wings' margins' and the halteres' bristles (${WING_TYPES.join(", ")})`, select: { superClass: "vnc_sensory", type: WING_TYPES } },
+  {
+    // Its bristles are among the abdominal nerves' sensory neurons of no known
+    // modality, which the data doesn't sort further (README, Senses).
+    sense: "touchAbdomen",
+    description: "The abdominal nerves' sensory neurons of no known modality, its bristles among them",
+    select: { superClass: ["vnc_sensory", "sensory_ascending"], class: "unknown_sensory", subClass: "abdomen" },
+  },
+  {
+    sense: "touchLegs",
+    description: "The legs' tactile neurons: every other tactile neuron of the cord",
+    select: { superClass: "vnc_sensory", class: "mechanosensory_tactile", type: (t: string) => !NOTUM_TYPES.includes(t) && !WING_TYPES.includes(t) },
+  },
+];
+// A bristle neuron's mean rate over half a second of deflection: about 13
+// spikes in its first 60 ms, then 25 Hz while held (Tuthill & Wilson 2016,
+// Cell 164:1046, Figure 2A, counted from the raster). Wherever it is: a
+// bristle's neuron answers its own bristle, and the body says which are bent.
+export const BRISTLE_RATE = 50;
+
 export const SENSES: readonly SenseSpec[] = [
   { sense: "loomLeft", name: "loomLeft", description: "Looming detectors (LPLC2, LC4) of the left eye", select: sided(LOOMING, "left"), maxRate: 100 },
   { sense: "loomRight", name: "loomRight", description: "Looming detectors (LPLC2, LC4) of the right eye", select: sided(LOOMING, "right"), maxRate: 100 },
   {
     sense: "touch",
     name: "touch head",
-    description: "Mechanosensory bristle neurons of the head (BM types)",
+    description: "Mechanosensory bristle neurons of the head (BM types), by part and side",
     select: { superClass: "cb_sensory", type: /^BM/ },
-    maxRate: 50,
+    regions: HEAD_TOUCH,
+    maxRate: BRISTLE_RATE,
     gated: true,
   },
   {
     sense: "touch",
     name: "touch body",
-    description: "Mechanosensory bristle neurons of the thorax, abdomen and legs",
-    select: { superClass: "vnc_sensory", subClass: "mechanosensory_bristle" },
-    maxRate: 10,
+    description: "Mechanosensory bristle neurons of the notum, wings and halteres, abdomen and legs",
+    select: { superClass: ["vnc_sensory", "sensory_ascending"], class: ["mechanosensory_tactile", "unknown_sensory"] },
+    regions: BODY_TOUCH,
+    maxRate: BRISTLE_RATE,
     gated: true,
   },
   {
@@ -225,10 +318,11 @@ export const SENSES: readonly SenseSpec[] = [
  * the fly isn't known circuit by circuit, and the model has none of it, so
  * the senses that arousal thresholds are measured with (touch, the antennae,
  * the legs' load) reach the brain at a lower rate: at depth 1, 60% of it.
- * Chosen by what it does (README, Sleep and the daily rhythm): stroking (touch
- * 1) then arrives as touch 0.6, which rouses a fly that is only still, and the
- * feather resting (0.4) as 0.24, less than a raindrop; at half, stroking hardly
- * woke it. The eyes aren't gated: a loom still reaches the giant fiber.
+ * Chosen by what it does (README, Sleep and the daily rhythm), while touch
+ * still drove every bristle at once: stroking (touch 1) then arrived as touch
+ * 0.6, which rouses a fly that is only still, and the feather resting (0.4) as
+ * 0.24, less than a raindrop; at half, stroking hardly woke it. Not chosen
+ * again since touch lands where it does. The eyes aren't gated: a loom still reaches the giant fiber.
  */
 export const SLEEP_GATE = 0.4;
 
@@ -278,6 +372,38 @@ export const STATE_INPUTS: readonly StateSpec[] = [
     maxRate: 10,
   },
 ];
+
+/**
+ * The aristae's thermoreceptors. Each arista holds three heating cells (Gr28b.d)
+ * and three cooling cells (Ir21a, Ir25a, Ir93a), one of each in each of its
+ * three sensilla (Gallio et al. 2011; Ni et al. 2013; Budelli et al. 2019).
+ * Their axons end in the antennal lobe's VP2 (heating) and VP3 (cooling)
+ * glomeruli (Gallio et al. 2011; Frank et al. 2015; Marin et al. 2020, who
+ * reconstructed them: Gr28b.d in VP2, Ir21a in VP3), and the dataset's types
+ * are named for those: TRN_VP2, and TRN_VP3a and TRN_VP3b. Side is the
+ * antenna's (`scripts/thermo.ts` checks it against FlyEM's root sides). The
+ * sacculus's VP1 cells are left out: which of them answer cooling and which
+ * humidity is still a proposal (Marin et al. 2020), and the annotations name
+ * them the other way round from it.
+ */
+export const THERMO_INPUTS: readonly ThermoSpec[] = (["left", "right"] as const).flatMap((side) => [
+  {
+    name: `heating ${side}`,
+    side,
+    cell: "heating" as const,
+    description: `Heating cells (Gr28b.d) of the ${side} arista, TRN_VP2`,
+    select: { superClass: "cb_sensory", class: "thermosensory", type: "TRN_VP2", side },
+    maxRate: 0,
+  },
+  {
+    name: `cooling ${side}`,
+    side,
+    cell: "cooling" as const,
+    description: `Cooling cells (Ir21a) of the ${side} arista, TRN_VP3a and TRN_VP3b`,
+    select: { superClass: "cb_sensory", class: "thermosensory", type: ["TRN_VP3a", "TRN_VP3b"], side },
+    maxRate: 0,
+  },
+]);
 
 /**
  * The dorsal fan-shaped body's sleep-promoting neurons: its layers' 6 and 7
@@ -405,9 +531,9 @@ export function waterOutputGain(thirst: number): number {
   return THIRST.sated + (1 - THIRST.sated) * thirst;
 }
 
-/** Each sense's intensity, 0..1 (grounded as 0 or 1). */
-export function intensity(senses: BrainSenses, sense: ScalarSense): number {
-  const value = senses[sense];
+/** Each sense's intensity, 0..1 (grounded as 0 or 1; a touch region left out, 0). */
+export function intensity(senses: BrainSenses, sense: ScalarSense | TouchSense): number {
+  const value = senses[sense] ?? 0;
   if (typeof value === "boolean") return value ? 1 : 0;
   return clamp(value, 0, 1);
 }
@@ -422,10 +548,18 @@ export function sleepGate(senses: BrainSenses): number {
   return 1 - SLEEP_GATE * stateOf(senses, "sleepDepth");
 }
 
-/** Each sense input's rate, Hz per neuron, for these senses. */
+/** Each sense input's rate, Hz per neuron, for these senses: the inputs of one rate (those with regions have one a region, `regionRate`). */
 export function senseRates(wiring: Pick<Wiring, "senses">, senses: BrainSenses): Map<string, number> {
   const gate = sleepGate(senses);
-  return new Map(wiring.senses.map(({ spec, maxRate }) => [spec.name, maxRate * intensity(senses, spec.sense) * (spec.gated ? gate : 1)]));
+  return new Map(
+    wiring.senses.filter(({ spec }) => !spec.regions).map(({ spec, maxRate }) => [spec.name, maxRate * intensity(senses, spec.sense) * (spec.gated ? gate : 1)]),
+  );
+}
+
+/** A region's rate, Hz per neuron: its group's full rate times the stronger of the region's own sense and the group's, gated as the group is. */
+export function regionRate(group: Wiring["senses"][number], region: TouchRegion, senses: BrainSenses): number {
+  const felt = Math.max(intensity(senses, group.spec.sense), intensity(senses, region.sense));
+  return group.maxRate * felt * (group.spec.gated ? sleepGate(senses) : 1);
 }
 
 
@@ -459,10 +593,13 @@ export function outputSynapses(connectome: Connectome, neurons: ArrayLike<number
 }
 
 export type Wiring = {
-  senses: { spec: SenseSpec; neurons: Uint32Array; maxRate: number }[];
+  /** With regions, `ends[r]` is where region r's neurons end in `neurons` (they start where the one before ends). */
+  senses: { spec: SenseSpec; neurons: Uint32Array; maxRate: number; ends?: Uint32Array }[];
   background: { spec: (typeof BACKGROUND)[number]; neurons: Uint32Array; maxRate: number }[];
   /** The internal-state inputs this connectome has neurons for. */
   state: { spec: StateSpec; neurons: Uint32Array; maxRate: number }[];
+  /** The thermoreceptor inputs this connectome has neurons for. */
+  thermo: { spec: ThermoSpec; neurons: Uint32Array }[];
   /** The internal state that sets excitability, where this connectome has its neurons. */
   excitability: { spec: ExcitabilitySpec; neurons: Uint32Array }[];
   readouts: { spec: ReadoutSpec; neurons: Uint32Array }[];
@@ -475,9 +612,34 @@ export function balanceFactor(connectome: Connectome, mine: ArrayLike<number>, t
   return a > b && a > 0 ? b / a : 1;
 }
 
+/**
+ * A group of regions: their neurons, region after region; throws if a region's
+ * neuron is outside the group or in another region too. A region this
+ * connectome has no neurons for (a test's) is left empty: nothing it feels
+ * reaches anything.
+ */
+function regional(connectome: Connectome, spec: SenseSpec): Wiring["senses"][number] {
+  // Marks, not sets: a group's neurons are thousands, checked one by one.
+  const within = new Uint8Array(connectome.neurons);
+  for (const i of select(connectome, spec.select)) within[i] = 1;
+  const seen = new Uint8Array(connectome.neurons);
+  const ends = new Uint32Array(spec.regions!.length);
+  const neurons: number[] = [];
+  spec.regions!.forEach((region, r) => {
+    for (const i of select(connectome, region.select)) {
+      if (within[i] === 0) throw new Error(`Neuron ${i} of "${region.sense}" is outside "${spec.name}"`);
+      if (seen[i] === 1) throw new Error(`Neuron ${i} of "${region.sense}" is in another region of "${spec.name}" too`);
+      seen[i] = 1;
+      neurons.push(i);
+    }
+    ends[r] = neurons.length;
+  });
+  return { spec, neurons: Uint32Array.from(neurons), maxRate: spec.maxRate, ends };
+}
+
 /** Resolves every group against a connectome; throws if a group is empty or an input is also read. */
 export function wire(connectome: Connectome): Wiring {
-  const senses = SENSES.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate }));
+  const senses: Wiring["senses"] = SENSES.map((spec) => (spec.regions ? regional(connectome, spec) : { spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate }));
   const background = BACKGROUND.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate }));
   for (const groups of [senses, background]) {
     for (const each of groups) {
@@ -486,15 +648,16 @@ export function wire(connectome: Connectome): Wiring {
     }
   }
   const state = STATE_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
+  const thermo = THERMO_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const excitability = STATE_EXCITABILITY.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const readouts = READOUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) }));
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
-  const driven = new Set<number>();
-  for (const group of [...senses, ...background, ...state, ...excitability]) for (const i of group.neurons) driven.add(i);
+  const driven = new Uint8Array(connectome.neurons);
+  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo]) for (const i of group.neurons) driven[i] = 1;
   for (const group of readouts) {
-    for (const i of group.neurons) if (driven.has(i)) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
+    for (const i of group.neurons) if (driven[i] === 1) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
-  return { senses, background, state, excitability, readouts };
+  return { senses, background, state, excitability, thermo, readouts };
 }

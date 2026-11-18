@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped } from "../src/index.ts";
+import { AMBIENT_TEMPERATURE, FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TASTES, TABLE_RADIUS, World, createPicnic, createSurface, isDropped, otherTastes } from "../src/index.ts";
 import type { RayHit, Solid } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -108,6 +108,22 @@ test("eating takes food down, dropped food is gone when eaten, patches come back
   const water = pantry.drop("water", 80, 0);
   assert.equal(pantry.touching(80, 0, 0, 0.3), water);
   assert.equal(water.sweet, 0);
+});
+
+test("dropped coffee is an espresso and bitter sugar a lump soaked in one, and a room rebuilds both by kind", () => {
+  const pantry = new Pantry(openTable(300));
+  const coffee = pantry.drop("coffee", 0, 0);
+  assert.deepEqual([coffee.sweet, coffee.water, coffee.bitter], [TASTES.espresso.sweet, TASTES.espresso.water, TASTES.espresso.bitter]);
+  assert.equal(coffee.bitter, 1);
+  const laced = pantry.drop("laced", 50, 0);
+  assert.deepEqual([laced.sweet, laced.water, laced.bitter], [TASTES.sugaredEspresso.sweet, TASTES.sugaredEspresso.water, TASTES.sugaredEspresso.bitter]);
+  // As sweet as sugar; the sugar dissolved in its coffee thins the caffeine.
+  assert.equal(laced.sweet, FOODS.sugar.sweet);
+  assert.ok(laced.bitter > 0 && laced.bitter < coffee.bitter);
+  assert.equal(pantry.touching(50, 0, 0, 0.3), laced);
+  // The wire carries sweetness alone: the rest comes from the kind.
+  assert.deepEqual(otherTastes([], laced.id, "laced", laced.name), { water: laced.water, bitter: laced.bitter });
+  assert.deepEqual(otherTastes([], coffee.id, "coffee", coffee.name), { water: coffee.water, bitter: 1 });
 });
 
 test("at most a few dropped foods at once: the oldest makes way", () => {
@@ -347,4 +363,24 @@ test("a short ray among what was gathered round a point meets what a ray through
     }
   }
   assert.ok(near > 50);
+});
+
+test("the air is the place's ambient temperature, 25 °C where it names none, warmer or cooler near its spots, and its own again when loaded", () => {
+  const plain = openTable(50);
+  assert.equal(AMBIENT_TEMPERATURE, 25);
+  assert.equal(plain.temperature.at(10, 1, -20), 25);
+  const spot = { x: 10, y: 0, z: 0, radius: 4, delta: 6 };
+  const place = { floor: { kind: "circle" as const, r: 50 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320, climate: { ambient: 22, spots: [spot] } };
+  const warm = new World(place);
+  assert.equal(warm.temperature.at(10, 0, 0), 28);
+  assert.ok(Math.abs(warm.temperature.at(10 + 1.1774 * 4, 0, 0) - 25) < 0.01, "half as much warmer at 1.18 radii");
+  assert.ok(warm.temperature.at(40, 0, 0) - 22 < 1e-6);
+  // Something warm put down while the place is loaded, then the place loaded again.
+  warm.temperature.spots.push({ x: -10, y: 0, z: 0, radius: 2, delta: -9 });
+  assert.equal(warm.temperature.at(-10, 0, 0), 22 - 9 + 6 * Math.exp(-400 / 32));
+  warm.load(place);
+  assert.equal(warm.temperature.spots.length, 1);
+  assert.equal(place.climate.spots.length, 1, "the place's own spots aren't changed");
+  warm.load(plain.place);
+  assert.equal(warm.temperature.at(10, 0, 0), 25);
 });

@@ -206,8 +206,9 @@ crossings become smaller than a pixel, without extra meshes or draws.
   `quiet` (nobody has touched the remote for a while). Anything that keeps
   clear of the fly keeps clear of whichever is nearest; `SceneSet.feel`
   gives what reaches each of the others. It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
-  felt as wind, and it carries the fly in flight as a puff does), `touch` (a
-  raindrop landing on it, 0 to 1) and `looming` (things it could see coming,
+  felt as wind, and it carries the fly in flight as a puff does), `contacts` (a
+  raindrop landing on it: where, how far round and how hard, felt as touch
+  there, `packages/body/src/touch.ts`) and `looming` (things it could see coming,
   for a brain without eyes). Food goes into the pantry with `pantry.add`, to
   be found by walking and tasting. Start comings and goings only while
   `quiet`, so what the fly does while someone plays answers what they do. The
@@ -402,7 +403,9 @@ summer storms); it makes no claim about local temperature or hemisphere.
 room server and clients.
 
 **Cold proposal, not implemented:** real fruit flies become sluggish in the
-cold, but temperature and metabolic slowing are not modelled by this brain.
+cold, but metabolic slowing is not modelled by this brain. Its antennae feel
+the air's temperature (`World.temperature`), but no place takes it from the
+weather: every place is 25 °C unless something warm or cool is put in it.
 Do not infer a cold response from a fly standing still in snow. A future
 labelled physiological stand-in could scale body/brain time with a documented
 temperature curve, with explicit owner approval and tests distinguishing it

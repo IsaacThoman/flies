@@ -100,7 +100,7 @@ export class Fuzz {
   message(id: number, epoch = 0): unknown {
     const m = this.pick<() => Record<string, unknown> | unknown>([
       () => ({ type: "ping", t: this.num(1e6) }),
-      () => ({ type: "drop", id: this.or(id * DROP_ID + this.int(0, 50)), kind: this.or(this.pick(["sugar", "honey", "berry", "water", "patch", "found"])), x: this.num(), z: this.num(), y: this.num(), at: this.num(1e6) }),
+      () => ({ type: "drop", id: this.or(id * DROP_ID + this.int(0, 50)), kind: this.or(this.pick(["sugar", "honey", "berry", "water", "coffee", "laced", "patch", "found"])), x: this.num(), z: this.num(), y: this.num(), at: this.num(1e6) }),
       () => ({ type: "ball", at: this.num(1e6), from: this.v3(), via: this.v3(), to: this.v3() }),
       () => ({ type: "world", light: this.or(this.pick(TABLE_LIGHTS)), weather: this.or(this.pick(TABLE_WEATHERS)) }),
       () => ({ type: "place", place: this.or(this.pick(PLACES)) }),

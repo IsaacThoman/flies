@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PATCHES, Pantry, SOLIDS, World, createPicnic } from "@fly/world";
-import { ANTENNA_AHEAD, FLY_LENGTH, FlyBody, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent } from "../src/index.ts";
+import { PATCHES, Pantry, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
+import { ANTENNA_AHEAD, CONTACT_TOUCH, Contacts, FLY_HEIGHT, FLY_LENGTH, FlyBody, HIT_FULL_SPEED, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent } from "../src/index.ts";
 import type { Intent, Looming, SenseInput } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -12,7 +12,7 @@ const world = createPicnic();
 const pantry = new Pantry(world, PATCHES);
 
 function input(body: FlyBody, extra: Partial<SenseInput> = {}): SenseInput {
-  return { dt: DT, body, world, pantry, looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, eyesOpen: false, proboscis: 0, ...extra };
+  return { dt: DT, body, world, pantry, looming: [], air: { x: 0, y: 0, z: 0 }, eyesOpen: false, proboscis: 0, ...extra };
 }
 
 /** A ball flying straight at the fly's head from `from`, at `speed` mm/s. */
@@ -121,6 +121,22 @@ test("it tastes sugar with its feet and its mouth, only while on its feet", () =
   assert.equal(m.tasting.byMouth, true);
 });
 
+test("facing up a fruit's curve, its mouth tastes what is on the fruit ahead of it", () => {
+  // The windowsill's banana: the split near its stalk, with the fly a little down its side, its mouth on the juice.
+  const sill = new World(WINDOWSILL);
+  const pantry = new Pantry(sill, WINDOWSILL.patches);
+  const banana = pantry.foods.find((f) => f.name === "banana")!;
+  const yaw = Math.atan2(banana.x, banana.z);
+  const back = MOUTH_AHEAD * FLY_LENGTH;
+  const body = new FlyBody(sill, { x: banana.x - Math.sin(yaw) * back, z: banana.z - Math.cos(yaw) * back, yaw, y: banana.y + 0.5 });
+  const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
+  assert.ok(sill.heightAt(mouth.x, mouth.z, body.position.y + 0.5) > body.position.y + 0.05, "the banana rises under its mouth");
+  const tracker = new SenseTracker();
+  assert.equal(tracker.update(input(body, { world: sill, pantry })).sweet, banana.sweet);
+  assert.equal(tracker.tasting.food, banana);
+  assert.equal(tracker.tasting.byMouth, true);
+});
+
 test("it tastes water and bitterness as it tastes sugar: plain water as water, sugar as not, coffee's dregs as bitter", () => {
   const table = openTable(300);
   const pantry = new Pantry(table, [
@@ -137,7 +153,7 @@ test("it tastes water and bitterness as it tastes sugar: plain water as water, s
   assert.equal(new SenseTracker().update({ ...input(new FlyBody(table, { x: 50, z: 50, yaw: 0 })), world: table, pantry: dropped }).water, 1);
 });
 
-test("wind is its own speed through the air; touch follows a stroke and eases out", () => {
+test("wind is its own speed through the air; touch lands where it does and eases out", () => {
   const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
   const tracker = new SenseTracker();
   body.mode = "airborne";
@@ -151,18 +167,46 @@ test("wind is its own speed through the air; touch follows a stroke and eases ou
   assert.ok(s.wind < 0.05);
   body.mode = "standing";
   body.velocity.x = 0;
-  assert.equal(tracker.update(input(body, { stroke: 1 })).touch, 1);
-  s = tracker.update(input(body));
-  assert.ok(s.touch < 1 && s.touch > 0.8);
-  for (let i = 0; i < 60; i++) s = tracker.update(input(body));
+  // Stroked on its back: its notum and wings feel it, its head doesn't, and nothing is felt everywhere at once.
+  const contacts = new Contacts();
+  contacts.add(body.position.x, body.position.y + FLY_HEIGHT, body.position.z, 1, 1);
+  s = tracker.update(input(body, { contacts }));
+  assert.equal(s.touchNotum, 1);
+  assert.ok((s.touchWings ?? 0) > 0);
+  assert.equal(s.touchFrontLeft, 0);
+  assert.equal(s.touchEyeRight, 0);
   assert.equal(s.touch, 0);
+  assert.equal(tracker.touched, 1);
+  s = tracker.update(input(body));
+  assert.ok((s.touchNotum ?? 0) < 1 && (s.touchNotum ?? 0) > 0.8);
+  assert.ok(tracker.touched < 1 && tracker.touched > 0.8);
+  for (let i = 0; i < 60; i++) s = tracker.update(input(body));
+  assert.equal(s.touchNotum, 0);
+  assert.equal(tracker.touched, 0);
 });
 
-test("bumping into something in flight is felt as touch", () => {
+test("bumping into something in flight is felt where it hits: flying into a wall ahead, on its face", () => {
   const body = new FlyBody(world, { x: 0, z: -150, yaw: 0 });
+  body.mode = "airborne";
   const tracker = new SenseTracker();
-  body.events.hit = 400;
-  assert.equal(tracker.update(input(body)).touch, 1);
+  // It faces +z: the wall's way out is back toward -z.
+  body.hitAgainst(HIT_FULL_SPEED, 0, 0, -1);
+  const s = tracker.update(input(body));
+  assert.equal(s.touchFrontLeft, 1);
+  assert.equal(s.touchFrontRight, 1);
+  assert.equal(s.touchNotum, 0);
+  assert.equal(s.touchAbdomen, 0);
+  assert.equal(tracker.touched, 1);
+});
+
+test("another fly pushing it is felt where it pushes", () => {
+  const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
+  const tracker = new SenseTracker();
+  // Against its left flank, at its middle's height (crowd.ts, Crowd.contact).
+  const s = tracker.update(input(body, { pushed: { touch: CONTACT_TOUCH, contact: { x: 0.75, y: 0.75, z: -0.3 } } }));
+  assert.ok((s.touchLegs ?? 0) > 0 || (s.touchAbdomen ?? 0) > 0);
+  for (const part of ["touchEyeLeft", "touchEyeRight", "touchFrontLeft", "touchFrontRight", "touchNotum"] as const) assert.equal(s[part], 0, part);
+  assert.equal(tracker.touched, CONTACT_TOUCH);
 });
 
 test("the strongest contacted intensity wins regardless of food order or taste site", () => {
@@ -214,4 +258,20 @@ test("mouth food remains eligible when the feet taste something stronger", () =>
   assert.equal(tracker.update(input(body, { world, pantry })).sweet, 0);
   assert.equal(tracker.tasting.food, null);
   assert.equal(tracker.tasting.byMouth, false);
+});
+
+test("each antenna feels the air's temperature at its tip: 25 °C on a plain table, more on the side nearer a warm spot", () => {
+  const table = openTable(100);
+  const body = new FlyBody(table, { x: 0, z: 0, yaw: 0 });
+  const tracker = new SenseTracker();
+  const plain = tracker.update(input(body, { world: table, pantry: new Pantry(table, []) }));
+  assert.equal(plain.temperatureLeft, 25);
+  assert.equal(plain.temperatureRight, 25);
+  // Facing +z, its left is +x: a warm spot off to its left.
+  table.temperature.spots.push({ x: 3, y: 0, z: 1, radius: 2, delta: 6 });
+  const s = tracker.update(input(body, { world: table, pantry: new Pantry(table, []) }));
+  assert.ok(s.temperatureLeft! > s.temperatureRight! + 0.1, `left ${s.temperatureLeft}, right ${s.temperatureRight}`);
+  assert.ok(s.temperatureRight! > 25);
+  const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, 0.3, 0.12, { x: 0, y: 0, z: 0 });
+  assert.equal(s.temperatureLeft, table.temperature.at(tip.x, tip.y, tip.z));
 });

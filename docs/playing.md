@@ -30,14 +30,14 @@ after you last did. The ring answers the hand: dropping food, throwing the ball 
 and it springs back; holding Tickle or Blow keeps it in a little, and a press it
 can't act on (the ball still in the air, Up past the last kind) shakes it.
 Food that lands sets a faint ring spreading round it. None of this is in the
-fly's world.
+fly's world; the fingertip ([Finger](#the-fingertip)) is.
 
 | On the remote | Does |
 | --- | --- |
-| Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead. |
+| Swipe on the touch surface | Moves your hand across the table. With View or Photo in hand, turns the camera round the fly and up or down instead; on Why?, goes back and forth through what it plays. |
 | Left / Right | Picks a tool from the shelf. |
-| Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. |
-| Select | Uses the tool: drops food, throws the ball, sets a piece down, turns or takes one away. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
+| Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. With Photo in hand, brings the camera in and takes it out. |
+| Select | Uses the tool: drops food, throws the ball, puts the fingertip down or lifts it, sets a piece down, turns or takes one away, takes a photo. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
 | Back on the menu | On Apple TV, leaves at the root. In the browser, returns to play after play has begun. |
 
@@ -47,10 +47,12 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | --- | --- | --- |
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
 | Feed, Swoop, Build | Tap where you mean. | Click there. |
+| Photo | Tap the world, or the tool again. | Click the world, or the tool. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
+| Finger | The fingertip goes where you touch, and a drag carries it; a tap puts it down or lifts it. | It follows the cursor; a click puts it down or lifts it, and a drag carries it. |
 | Sky, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too (on the Sky, its weather). The Sky has two labels side by side, the time of day and the weather, each with its own arrows (one over the other where they don't fit). Place has a Go button for somewhere the fly isn't. | The same, or the wheel over a label. |
 | Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
-| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
+| Round the fly | Drag anywhere but with the feather, the air or the fingertip in hand on the table (they go where the finger goes); or drag with two fingers. On Why?, the same drag goes back and forth through it. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
 | Back to Follow | Double-tap the air. | Double-click the air, or R. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
 | Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
@@ -59,12 +61,13 @@ Pointing, the screen itself is what you press, and there are no button hints:
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
 tool (1 the first, 0 the tenth), + and − held bring the camera in and take it out, Q and E held turn it
-round the fly, W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
+round the fly (on Why?, go back and forth through it), W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was
 last pressed. A standard game pad (the Gamepad API) is the remote too: A is
 Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the
 arrows, the left stick moves your hand (and steps through a menu), the right
-stick turns the camera round and up (pressed in, back to Follow), the triggers bring
+stick turns the camera round and up (pressed in, back to Follow; on Why?,
+across goes back and forth through it), the triggers bring
 it in and take it out as far as they are pressed; its hints are drawn as its
 buttons. A pad that can
 rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
@@ -80,8 +83,10 @@ screensaver, using arrow, pointing or grabbing cursors elsewhere. It suppresses 
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are, about the fly, **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
-removes your offerings, including those still falling, leaving the place’s own food), **Tickle** (a feather: resting on
+The tools are, about the fly, **Feed** (sugar, honey, raspberry, water, coffee, bitter sugar,
+and Clear dropped, which removes your offerings, including those still falling, leaving the
+place’s own food; what a fly makes of each is in [the world](world.md#food)), **Finger**
+(a fingertip in the fly's world, below), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot) and **Swoop** (a dark
 beach ball dives at the spot and veers away); and, about its world and the
@@ -90,11 +95,19 @@ below), **Sky** (the time of day: now, which follows the clock, or morning,
 midday, golden hour, dusk, night, on Up and Down; and the weather: now, which
 follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm,
 snow, sleet, on Select, round and round), **Place** (where it lives; Up and
-Down choose, Select carries it there) and **View** (close up, follow, wide, the whole table, from above,
-through the fly's eyes, and inside it, close up with the fly as glass; Up
-brings the camera in, Down takes it out). On the shelf the two groups stand
+Down choose, Select carries it there), **View** (close up, follow, wide, the whole table, from above,
+through the fly's eyes, inside it, close up with the fly as glass, and
+[Why?](#why), its last few seconds played back; Up brings the camera in, Down
+takes it out) and **Photo** (a picture of the world as the camera shows it, for
+the fly's [journal](#journal): with it in hand your hand is off the table,
+swipes and drags turn the camera, Up and Down bring it in and out, and Select
+takes the picture; the screen flashes white after the picture has been taken,
+so the flash, the hints and everything else drawn over the world are never in
+it). On the shelf the two groups stand
 apart, or, on a screen too narrow for them in a row, the fly's over its
-world's; Left and Right go along all of them. Hints in the
+world's, with the menu's button beside the fly's row; Left and Right go along
+all of them. On the TV more than eight tools come closer together rather than
+reach the pictures in the bottom corners. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
 once you have gone along it, and what Select does with a tool once you have
 used it (held it, for Tickle and Blow), on later launches too; the Sky's
@@ -125,6 +138,129 @@ something to find. It comes back to the view last chosen (but never through
 the fly's eyes, which would open on no fly at all), and to a time of day or a
 weather chosen in the last six hours; after that it is back on Now, so the
 screensaver follows the clock again.
+
+## Why?
+
+**View → Why?** answers "why did it do that?" with what its nervous system
+did, and nothing else (`apps/web/src/why/`). The game keeps the followed
+fly's last six seconds all the time, 30 times a second: each region's firing
+rate as the nervous-system display gets it, the rate of each group of neurons
+a command is read from, the commands, every sense as its body sent it, and
+what the body did with them. Choosing Why? takes a copy of that and plays it
+back at a quarter of the speed, over and over, in a large glass card where
+what it sees would be: its nervous system from above, glowing as it did (the
+same drawing and glow as the corner panel, [rendering.md](rendering.md#its-nervous-system)),
+the In and out bars (as Stats → In and out has them) as they were, and under
+them a timeline with a line where the body acted.
+
+What it plays is the most striking thing the body began in those seconds: a
+take-off, then feeding, backing up, grooming, singing, a turn either way, and
+walking; the latest of the same. Each is the body's own state, so it begins
+where the body acted on a command (the take-off where the giant fiber passed
+its threshold). Marked on it: that command's row in Out, and rings round the
+somata of the neurons the brain package reads it from (DNp01 and the flight
+power motor neurons for a take-off, MN9 for feeding, MDN for backing, DNg12
+for grooming, pIP10 for song, the DNa02 of the side it turned to, DNg100 for
+walking), brighter as they fired, with their rates on the timeline and their
+names over it. Marked before it: each sense whose bar rose by a tenth in the
+second and a half before, and each region where senses come in (the eyes'
+pathway as far as the visual projection neurons, the antennae, the bristles,
+the taste organs, the legs' and wings' sensors) whose glow rose by 0.15. The
+light (a mean over both eyes, which a ball at one eye hardly moves), hunger
+and thirst (which move over minutes) aren't picked; with its eyes open a ball looms in
+its eyes' regions, not in the Loom bars, which carry only the loom felt with
+them shut. While something is marked, the rest of the drawing glows at 0.35
+of what was recorded, so the marked parts stand out; nothing is lit that
+didn't fire. If it began nothing in those seconds, it shows what it is still
+doing, without a run-up; if it did nothing at all, the last three seconds,
+unmarked. That something rose first doesn't say it caused what followed:
+Why? shows what came before and what fired.
+
+It pauses nothing: the fly lives on behind the card, and its brain keeps
+running. Going through it is the camera's gesture: a swipe on the remote with
+View in hand, Q and E, a pad's right stick across, a drag with a mouse or a
+finger (to the right, later; a drag the screen's width is all of it); it
+holds where it is left for a moment and plays on. Up, Select, or another
+view leaves it at once. Coming back to it takes what is kept then. It is
+never kept between launches. It is this device's own: nobody else at a table
+sees it, and it sends nothing.
+
+## The fingertip
+
+**Finger** puts your fingertip in the fly's world (`apps/web/src/tools/finger.ts`): a
+finger laid along the table, its rounded tip and nail, rising at the knuckle
+toward a hand out of the picture, at the fly's scale (15 mm across, a fly 2.5 mm
+long). Unlike the ring, it is really there: the fly's eyes see it, its body
+bumps into it and stands on it, its antennae feel it as they feel any wall. It
+comes in from above where your hand is, pointing at the fly, and is held a
+little way up; Select (Enter, A, a click or a tap) puts it down on whatever is
+under it, and again lifts it. Moving the hand moves it (a swipe, the left
+stick, the mouse, a finger on the screen), as fast as your hand goes. It
+stays where you leave it: unlike the ring it never drifts back to the fly,
+which would carry a fly standing on it along, or press on one under it. It
+never presses into anything: lowered onto the fly it comes to rest on its back
+or its head, a light touch felt where it rests (its notum and wings, or that
+side's eye: [the senses](simulation.md#the-flys-senses)), slid into it rides up
+over it (a full touch), and slid onto a sugar cube or a crumb it rests on that.
+
+Nothing about it steers the fly. A fly walks onto it if its brain walks it
+there: on its feet over the finger's skin, it is standing on it. Lifted and
+moved, the finger carries whoever stands on it (its feet stay where they
+stand: the body's contact with a moving surface), and the fly feels the air
+of being carried as wind and sees the world go by through its own eyes. Set
+down, it walks off when its brain walks it off; and if it takes off from the
+finger, it takes off. Put away (another tool, the screensaver), the finger
+sets down where it is and lifts away once nothing stands on it.
+
+One stand-in: the body walks up nothing steeper than 65° (Physics, in
+[what the body adds](simulation.md#what-the-body-adds)), where a real fly's
+feet climb a finger's side. So the finger's skin flares where it meets what it
+rests on, as a pressed fingertip's pad spreads, and is never steeper than 61°:
+drawn exactly as it is felt.
+
+What its brain makes of it, measured on the real connectome:
+
+- **Walking onto it.** A fly set down facing the finger, the edge of its tip
+  4 mm ahead of its head, walked onto it in 0 of 5, 0 of 5 and 3 of 8 tries
+  of up to a minute each, over 5 minutes of its life at 10:00, seeds 1 to 3
+  (`node scripts/finger.ts`, its eyes given a ray-cast picture of the
+  finger, the table and the sky). Most of that time it rests. A fly stood on
+  it by hand in the game walked off 1 to 15 s after it was set down, in six
+  runs. Carried on it lifted, in the last three runs it stayed on in 2 of 7
+  tries, walked off its edge and fell in 4, and took off in 1
+  (`apps/web/e2e/finger.e2e.ts`).
+- **Seeing it.** Down in front of it, 6 to 13% of its facets see the finger
+  (114 to 225 of 1,772 at midday, in eight runs). Its skin is drawn as skin
+  reflects: about 0.6 of red light, a third of green and a quarter of blue
+  (Anderson & Parrish 1981), so a fly's outer photoreceptors take 0.32 of a
+  white's light from it, as they take 0.31 from real skin. A photograph's skin
+  colour, the finger's first, gave them 0.43. In the eyes' picture, skin
+  against the picnic table now has a contrast of 0.40, from 0.30 before.
+  Real skin on white paint would give 0.58
+  ([the eyes](simulation.md#the-eyes)); the picture loses some of it.
+- **A fast finger.** Slid along the table at it at 600 mm/s and at 15 mm/s,
+  from straight ahead, from its front right (70°) and from its right side
+  (90°), three times each, in six runs: it took off in none of the 54 fast
+  approaches, nor of the slow. Its looming detectors peaked at medians of
+  0.8 to 3.9 Hz either way, and its giant fibre's escape command at 0.05 to
+  0.28. The ball, in the same runs, drove them to 5.8 to 9.2 Hz. In this model
+  a finger coming straight at its face doesn't startle it at any contrast,
+  even black, because the looming detectors that face forward (LPLC2) hardly
+  answer here. From its side one can, through LC4, if it is dark enough
+  against what is behind it: a 12 mm disc at 600 mm/s and real skin's
+  contrast (0.57) took it off for 3 of 6 seeds from its front right, and 0 of
+  6 at the contrast skin had in the picture
+  (`packages/brain/scripts/fingertip.ts`). Skin on the table, as the game's
+  eyes see it, isn't dark enough. With its brain's eyes shut, the tip looms as the
+  ball does, fully when fast and 0.26 when slow, and both drove escape to 1
+  (`apps/web/tests/finger-loom.test.ts`).
+- **Asleep under it.** A fly asleep (01:00, still five minutes), the finger
+  held over it and lowered onto it: its round end resting on all of it, it
+  was felt on its notum (0.40), its wings (0.08), its eyes (0.10) and the
+  front of its head (0.13), and it slept on for the 20 s watched (one run;
+  `apps/web/e2e/finger.e2e.ts`, (e)).
+
+At a table with others, the finger is yours alone ([online](online.md#who-owns-what)).
 
 ## Camera
 
@@ -244,7 +380,55 @@ or a bar it shows changes, at most four times a second.
 
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
-It has **Play**, **Watch** (the screensaver straight away), **About**, and
+It has **Play**, **Watch** (the screensaver straight away), **Settings**,
+**Online** (where it can be), **Journal** and **About**.
+
+## Journal
+
+**Journal** (`apps/web/src/ui/screens/journal.ts`) is the fly's pictures,
+newest first, each with its date and, for a first, an icon and a word or two
+where an icon can't say it (the food, the place, what it walked onto). The
+arrows go along and down them, Select opens one big, and there Left and Right
+go through them; Down reaches its buttons. With a finger or a mouse, a tap
+opens one, a drag or the wheel scrolls, and the arrows either side go through
+them.
+
+Two kinds of picture are in it. The player's own, taken with the Photo tool,
+and the fly's firsts, each kept once in its life and pictured as it happens:
+its first flight (a second of its wings beating in the air), its first meal of
+each food, its first groom (half a second of it), the first time it walks
+from one thing onto another, its first escape (its brain's escape command
+taking it off), its first sleep, and its first visit to each place. Each is
+read from what its life did (`apps/web/src/journal/moments.ts`, from the
+same counts and activity the day's tally keeps), never from a guess at how it
+felt. A first's picture is taken from a frame already drawn, as the camera
+films it then (yours in play, the cameraman's in the screensaver and behind
+the menu), within ten seconds of it and only from a frame that shows the fly
+well: in front of the camera, clear of the picture's edges, big enough to
+see, nothing fading over it. Arriving somewhere, the picture waits three
+seconds for the place to be seen. A first with no such frame in time is kept
+with its icon instead. Nothing waits on a picture and the camera is never
+moved for one: the frame is copied on the GPU and read back later, and made
+into a JPEG a millisecond a frame (`apps/web/src/journal/capture.ts`). Your
+hand's ring is left out of the frame a picture is taken from, so it blinks
+out for that one frame.
+
+The journal is kept on this device and never sent anywhere: not to the room,
+not to the other players, who see nothing of it. In a browser and the iPhone
+and iPad app it is kept in IndexedDB, up to 240 pictures, the player's at
+the screen's own size (up to 960 pixels across); on the Apple TV, which has
+only `localStorage` (in `NSUserDefaults`, where tvOS gives an app little
+room), up to 16, small (`apps/web/src/journal/store.ts`). When there is no
+more room the player's photos go, oldest first; a first loses its picture
+only once there are no photos left to go, and never its place in the
+journal. A broken save is read for what can be read. Where the host can hand
+a picture on, a picture opened big has **Save** (a download) or, on a phone,
+**Share** (the system's share sheet, where Save Image is); the player's own
+photos also have **Remove**. On the Apple TV the journal is the only place
+they are kept. It is the followed fly's, kept by its record's id
+([From launch to launch](simulation.md#from-launch-to-launch)): a
+companion, or a new fly, has none.
+
 ## Settings
 
 **Settings**: a row of tabs over each part of the game, every setting two

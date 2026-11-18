@@ -124,7 +124,7 @@ test("walking off a table's edge, it falls onto the chair seat pushed in under i
 test("under a table its antennae feel a leg they walk into, not the table top over them; in the air, the table top's edge", () => {
   const senses = new SenseTracker();
   const pantry = new Pantry(world, []);
-  const feel = (body: FlyBody) => senses.update({ dt: DT, body, world, pantry, looming: [], stroke: 0, air: still.air, eyesOpen: false, proboscis: 0 });
+  const feel = (body: FlyBody) => senses.update({ dt: DT, body, world, pantry, looming: [], air: still.air, eyesOpen: false, proboscis: 0 });
   const open = new FlyBody(world, { x: -50, z: 0, yaw: 0, y: 0 });
   assert.equal(feel(open).bumpLeft + feel(open).bumpRight, 0);
   const leg = new FlyBody(world, { x: -90 - 4 - HEAD_AHEAD * FLY_LENGTH - 2, z: -50, yaw: Math.PI / 2, y: 0 });

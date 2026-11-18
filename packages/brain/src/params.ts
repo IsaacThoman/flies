@@ -9,8 +9,8 @@ import { ORN_TABLE } from "./orn-table.ts";
 export type TransmitterFix = {
   /** What the fix is and why. */
   reason: string;
-  /** Which neurons it applies to (judged on the predicted transmitter, before any fix). */
-  applies(connectome: Connectome, i: number): boolean;
+  /** Which neurons it applies to (`nt` is the predicted transmitter, before any fix). */
+  select: NeuronQuery;
   /** The transmitter they get instead. */
   nt: string;
 };
@@ -73,11 +73,7 @@ export type OperatingPoint = {
   };
 };
 
-const superClass = (c: Connectome, i: number) => c.columns.superClass.value(i);
-const side = (c: Connectome, i: number) => c.columns.side.value(i);
-const type = (c: Connectome, i: number) => c.columns.type.value(i);
-const predicted = (c: Connectome, i: number) => c.columns.nt.value(i);
-const MONOAMINES = new Set(["DA", "SER", "OCT"]);
+const MONOAMINES: readonly string[] = ["DA", "SER", "OCT"];
 
 /**
  * Cell types known to be octopaminergic by name: every OA- type, and the
@@ -95,42 +91,42 @@ export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
   {
     reason:
       "Kenyon cells are cholinergic (Barnstedt et al. 2016). This dataset predicts them as dopaminergic, and dopamine is muted here, which would cut the mushroom body's output.",
-    applies: (c, i) => /^KC/.test(type(c, i)),
+    select: { type: /^KC/ },
     nt: "ACH",
   },
   {
     reason: "Photoreceptors are histaminergic; the prediction is blank for most of them.",
-    applies: (c, i) => superClass(c, i) === "ol_sensory" && predicted(c, i) === "",
+    select: { superClass: "ol_sensory", nt: "" },
     nt: "HIST",
   },
   {
     reason:
       "Mechanosensory, gustatory, olfactory and other primary sensory neurons outside the eye are cholinergic; the prediction is blank for about 2,100 of them, most head bristle neurons among them.",
-    applies: (c, i) => /sensory/.test(superClass(c, i)) && superClass(c, i) !== "ol_sensory" && predicted(c, i) === "",
+    select: { superClass: (s) => /sensory/.test(s) && s !== "ol_sensory", nt: "" },
     nt: "ACH",
   },
   {
     reason:
       "The head's mechanosensory neurons, its bristles' (BM) and Johnston's organ's (JO), are cholinergic like the rest of their types: the dataset's own type-level transmitter for them is acetylcholine. Eleven are predicted a monoamine one by one, at low confidence (51-73%, against a median of 95% for the bristles predicted cholinergic), and so were muted: seven bristle neurons, five of them on the right, which were the right side's whole route from the head's bristles to grooming, and four of the right antenna's zone E.",
-    applies: (c, i) => superClass(c, i) === "cb_sensory" && /^(BM|JO-)/.test(type(c, i)) && MONOAMINES.has(predicted(c, i)),
+    select: { superClass: "cb_sensory", type: /^(BM|JO-)/, nt: MONOAMINES },
     nt: "ACH",
   },
   {
     reason:
       "Antennal lobe local neurons are overwhelmingly GABAergic (Chou et al. 2010). The prediction makes 75 lateral LNs (lLN1, lLN2T, lLN2X and others) cholinergic; wired densely to each other, they then lock the antennal lobe into saturated firing after any olfactory input. The least certain fix.",
-    applies: (c, i) => /^lLN/.test(type(c, i)) && predicted(c, i) === "ACH",
+    select: { type: /^lLN/, nt: "ACH" },
     nt: "GABA",
   },
   {
     reason:
       "The octopaminergic neurons named for it (Busch et al. 2009's clusters, as FlyEM names them, OA-VL1 and OA-VL2 among them as DNd02 and DNd03) are octopaminergic; the prediction makes some glutamatergic, serotonergic or blank.",
-    applies: (c, i) => OCTOPAMINERGIC.test(type(c, i)),
+    select: { type: OCTOPAMINERGIC },
     nt: "OCT",
   },
   {
     reason:
       "The wake-promoting PPL1 neurons of the dorsal fan-shaped body (Liu et al. 2012; Ueno et al. 2012), FB5H, FB6H and FB7B in the hemibrain's types (Hulse et al. 2021), are dopaminergic; the prediction is blank.",
-    applies: (c, i) => DFB_DOPAMINERGIC.includes(type(c, i)),
+    select: { type: DFB_DOPAMINERGIC },
     nt: "DA",
   },
 ];
@@ -233,29 +229,37 @@ export const COLUMNAR_MIN_CELLS = 100;
  * same reason the columnar classes' rarer types, such as Mi18 (36 a side).
  */
 export function columnar(connectome: Connectome): Uint8Array {
-  const counts = new Map<string, number>();
-  const candidates = connectome.filter((i) => superClass(connectome, i) === "ol_intrinsic" && COLUMNAR_CLASSES.test(type(connectome, i)));
-  for (const i of candidates) {
-    const key = `${type(connectome, i)} ${side(connectome, i)}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
+  const candidates = connectome.find({ superClass: "ol_intrinsic", type: COLUMNAR_CLASSES });
+  // Counted by type and side, each by the first code with its name, so a table that repeats a name counts it as one.
+  const { type, side } = connectome.columns;
+  const named = (table: readonly string[]) => {
+    const first = new Map<string, number>();
+    return Uint32Array.from(table, (name, k) => first.get(name) ?? (first.set(name, k), k));
+  };
+  const types = named(type.table);
+  const sides = named(side.table);
+  const key = (i: number) => types[type.codes[i]] * side.table.length + sides[side.codes[i]];
+  const counts = new Uint32Array(type.table.length * side.table.length);
+  for (const i of candidates) counts[key(i)]++;
   const out = new Uint8Array(connectome.neurons);
-  for (const i of candidates) if (counts.get(`${type(connectome, i)} ${side(connectome, i)}`)! >= COLUMNAR_MIN_CELLS) out[i] = 1;
+  for (const i of candidates) if (counts[key(i)] >= COLUMNAR_MIN_CELLS) out[i] = 1;
   return out;
 }
 
 /** Each neuron's transmitter after the fixes, and how many neurons each fix changed. */
 export function transmitters(connectome: Connectome, fixes: readonly TransmitterFix[]): { nt: string[]; changed: number[] } {
-  const out = Array.from({ length: connectome.neurons }, (_, i) => predicted(connectome, i));
-  const changed = fixes.map(() => 0);
-  for (let i = 0; i < connectome.neurons; i++) {
-    fixes.forEach((fix, k) => {
-      if (out[i] !== fix.nt && fix.applies(connectome, i)) {
-        out[i] = fix.nt;
-        changed[k]++;
-      }
-    });
-  }
+  const { codes, table } = connectome.columns.nt;
+  const out = Array.from(codes, (code) => table[code]);
+  // Each neuron meets the fixes in order, whichever way round the loops go.
+  const changed = fixes.map((fix) => {
+    let count = 0;
+    for (const i of connectome.find(fix.select)) {
+      if (out[i] === fix.nt) continue;
+      out[i] = fix.nt;
+      count++;
+    }
+    return count;
+  });
   return { nt: out, changed };
 }
 
@@ -345,7 +349,8 @@ export type Weights = {
 /** The Simulation's wiring and gains at this operating point. */
 export function buildWeights(connectome: Connectome, point: OperatingPoint = OPERATING_POINT): Weights {
   const { nt, changed } = transmitters(connectome, point.fixes);
-  const gain = Float32Array.from(nt, (each) => transmitterGain(point, each));
+  const gain = new Float32Array(nt.length);
+  for (let i = 0; i < nt.length; i++) gain[i] = transmitterGain(point, nt[i]);
   if (point.graded !== 1) {
     const graded = columnar(connectome);
     for (let i = 0; i < connectome.neurons; i++) if (graded[i]) gain[i] *= point.graded;

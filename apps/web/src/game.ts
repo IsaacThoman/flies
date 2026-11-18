@@ -9,10 +9,12 @@
 // else, in play, to the world and the camera (controls.ts).
 
 import * as THREE from "three";
-import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
+import { Contacts, FLY_LENGTH, Rhythm, SUMMER, TOUCH_PARTS } from "@fly/body";
+import type { FlyBody } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
-import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
+import { AT_ROOT_PROPERTY, COMMAND_ORDER, INVITE_EVENT } from "@fly/contracts";
+import { SOMA_GROUPS } from "@fly/fly";
 import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import { BALL_RADIUS, Pantry, TOUCH, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
@@ -28,13 +30,18 @@ import type { Display, Frame } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
-import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
+import { DRAG_ROUND, DRAG_UP, NOTCH_ZOOM, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
 import { COLOURS, MAX_OWN, PROTOCOL, everyoneSeries, seriesFor, seriesPlace } from "@fly/net";
 import type { SeatedFly, TableStart } from "@fly/net";
 import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
+import { canHandOn, handOn } from "./journal/hand-on.ts";
+import type { HandedOn } from "./journal/hand-on.ts";
+import { Photos } from "./journal/photos.ts";
+import { journalShelf } from "./journal/store.ts";
+import type { Entry, Journal } from "./journal/store.ts";
 import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
 import { AutoJoin, launchSeat } from "./online/auto-join.ts";
@@ -72,12 +79,17 @@ import type { Aim } from "./tools/build.ts";
 import { DIALS, Hands, TOOLS } from "./tools/hands.ts";
 import type { Dial, DialId, ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
-import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
+import { Finger } from "./tools/finger.ts";
+import { FingerView } from "./tools/finger-view.ts";
+import { SENSES, StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
 import type { StatsState } from "./stats/panel.ts";
 import { Tally } from "./stats/tally.ts";
+import { Recorder } from "./why/recorder.ts";
+import type { Recorded } from "./why/recorder.ts";
+import { ReplayView } from "./why/replay.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
 import type { CornerPicture } from "./ui/corners.ts";
-import { HUD_HITS, drawHud, needsTeaching } from "./ui/hud.ts";
+import { HUD_HITS, SHUTTER_FLASH, drawHud, needsTeaching } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
@@ -85,6 +97,7 @@ import { LOADING_HITS, arriving, drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { Settle } from "./ui/settle.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
+import { JournalScreen } from "./ui/screens/journal.ts";
 import { settingsScreen, settingsTab, titleScreen } from "./ui/screens/menus.ts";
 import type { MenuScreen } from "./ui/screens/menu-screen.ts";
 import type { Knock, NewRoom, Point, Screen, ScreenId, Shell, TableNow } from "./ui/screens/types.ts";
@@ -159,7 +172,7 @@ const isArrow = (button: RemoteButton) => button === "up" || button === "down" |
 
 /** How a tool is used on the table, by a pointer. */
 function toolUse(id: string): ToolUse {
-  return id === "feed" || id === "swoop" || id === "build" ? "once" : id === "feather" || id === "blow" ? "hold" : "none";
+  return id === "feed" || id === "swoop" || id === "build" || id === "photo" ? "once" : id === "feather" || id === "blow" ? "hold" : id === "finger" ? "place" : "none";
 }
 
 export class Game implements Shell {
@@ -191,6 +204,11 @@ export class Game implements Shell {
   readonly kit: KitView;
   /** What the Build tool in hand points at this frame, if it is in hand. */
   #buildAim: Aim | null = null;
+  /** The player's fingertip in the fly's world (the Finger tool), and how it looks. */
+  readonly finger: Finger;
+  readonly fingerView: FingerView;
+  /** Every fly this device lives, for the finger to rest on or carry: refilled each frame. */
+  readonly #bodies: FlyBody[] = [];
   readonly haptics: Haptics;
   readonly eyes: Eyes;
   readonly inset: EyesInset;
@@ -205,11 +223,17 @@ export class Game implements Shell {
   /** How brightly each part of its nervous system glows, from the brain's region rates. */
   readonly glow: NerveGlow;
   readonly xray = new Xray();
+  /** The followed fly's last few seconds, kept for Why? (View), and Why? playing them back. */
+  readonly recorder = new Recorder();
+  readonly why: ReplayView;
+  #recorded: Recorded;
   readonly fireflies: Fireflies;
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
-  readonly screens: { title: MenuScreen; settings: MenuScreen; about: AboutScreen; online: OnlineScreen };
+  readonly screens: { title: MenuScreen; settings: MenuScreen; about: AboutScreen; online: OnlineScreen; journal: JournalScreen };
+  /** The fly's journal of firsts and the player's photos, and the pictures taken for it. */
+  readonly photos: Photos;
   /** At a room with others (docs/online.md), its line to the room and the others there; null alone. */
   online: Online | null = null;
   /** How the room this device was last at, or tried to sit at, ended: it left, or was turned away (removed, the room gone, locked). */
@@ -267,12 +291,15 @@ export class Game implements Shell {
   #clockAt = 0;
   #air = new THREE.Vector3();
   /** What the place's own goings-on did to the fly this frame, and what they are given. */
-  #felt: Felt = { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] };
+  #felt: Felt = { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] };
   #around: { -readonly [K in keyof Around]: Around[K] };
   #puff = { x: 0, y: 0, z: 0 };
   #middle = new THREE.Vector3();
   #floorAt = (x: number, z: number, below: number) => this.life.world.heightAt(x, z, below);
   #ndc = new THREE.Vector3();
+  /** The journal's changes last published. */
+  #journalSeen = -1;
+  readonly #framed = () => this.#framedWell();
   #ndc2 = new THREE.Vector2();
   #ray = new THREE.Raycaster();
   #hit: RayHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
@@ -398,6 +425,10 @@ export class Game implements Shell {
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.handsView = new HandsView(this.stage.scene);
     this.kit = new KitView(this.stage.scene);
+    this.finger = new Finger(world);
+    // A piece of the kit is never built into the fingertip, nor onto it.
+    this.builder.keepOut = (piece) => this.finger.blocks(piece);
+    this.fingerView = new FingerView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
     this.eyes.standIns = this.others;
     this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, company: this.#companyAt, shared: null };
@@ -405,15 +436,22 @@ export class Game implements Shell {
     this.eyes.see(this.kit.built);
     this.#fliesAt.push(this.life.body.position);
     for (const object of this.handsView.seen) this.eyes.see(object);
+    for (const object of this.fingerView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
     this.overlay.scene.add(this.inset.mesh);
     this.nerves = new NervesPanel(this.fly.model.nerves);
     this.overlay.scene.add(this.nerves.mesh);
     this.overlay.scene.add(this.statsPanel.mesh);
+    this.why = new ReplayView(this.fly.model.nerves);
+    this.overlay.scene.add(this.why.mesh, this.why.card);
+    this.#recorded = { regionRates: this.life.brain.regionRates, state: null, sensed: this.life.sensed, intent: this.life.intent, onFeet: true, jumped: false };
     this.touchLoupe = inputs.pointers ? new TouchLoupe() : null;
     if (this.touchLoupe) this.overlay.scene.add(this.touchLoupe.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
+    // The followed fly's journal: its firsts are its own, by its record's id.
+    this.photos = new Photos(journalShelf(), this.remembered.get(0)!.id);
+    this.photos.arrived(this.#here, placeInfo(this.#here).name, 0);
     this.#statsState = { spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
     this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
@@ -424,10 +462,11 @@ export class Game implements Shell {
       settings: settingsScreen(this),
       about: new AboutScreen(this),
       online: new OnlineScreen(this),
+      journal: new JournalScreen(this),
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, brainRunning: false, arrival: arriving(this.brain) ? this.brain : null, eyes: null, layout: this.#hudLayout };
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, shutter: Infinity, brainRunning: false, arrival: arriving(this.brain) ? this.brain : null, eyes: null, layout: this.#hudLayout };
     // Nothing points on the Apple TV: nothing to record.
     this.overlay.hits.enabled = !!inputs.pointers;
     this.#applyFrame();
@@ -606,6 +645,22 @@ export class Game implements Shell {
   /** The link to the table this device is at. */
   get tableLink(): string | null {
     return this.online && typeof location !== "undefined" ? inviteLink(location.href, this.online.code, this.#app) : null;
+  }
+
+  /** The fly's journal, once it is open. */
+  get journal(): Journal | null {
+    return this.photos.journal;
+  }
+
+  /** Whether a picture can be handed on from here (not on the Apple TV, where the journal keeps it). */
+  get canSavePictures(): boolean {
+    return canHandOn();
+  }
+
+  /** Hands a picture from the journal on: on a phone the share sheet, elsewhere a download. Called from a press. */
+  async savePicture(entry: Entry): Promise<HandedOn> {
+    const url = await this.photos.journal?.picture(entry);
+    return url ? handOn(url, entry.at, this.shape.coarse) : "failed";
   }
 
   /** A share sheet or a clipboard to hand the link on with: not on the Apple TV, where a phone scans the room's QR code instead. */
@@ -898,7 +953,8 @@ export class Game implements Shell {
     const p = this.#player;
     const playing = this.nav.current === "play" && !this.wallpaper;
     p.away = typeof document !== "undefined" && document.hidden;
-    p.handsOut = playing;
+    // Holding the camera, the hand is off the table, for the others too.
+    p.handsOut = playing && this.hands.current.id !== "photo";
     p.playing = playing && (performance.now() - Math.max(this.remote.lastInputAt, this.devices.at)) / 1000 < QUIET_AFTER;
     p.holding = playing && (this.remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld));
     this.#copyEye();
@@ -961,6 +1017,7 @@ export class Game implements Shell {
     this.inset.layout(frame, this.#hudLayout, size);
     this.nerves.layout(frame, this.#hudLayout, size);
     this.statsPanel.layout(frame, this.#hudLayout, size, statsKind);
+    this.why.layout(frame, this.#hudLayout);
   }
 
   /** Where the camera leaves the fly on the title and the loading screen, clear of what is drawn there. */
@@ -1119,6 +1176,7 @@ export class Game implements Shell {
 
   contextLost() {
     this.glLost = true;
+    this.photos.contextLost();
   }
 
   /** three.js rebuilds its own state; what was drawn into textures (the reflections) has to be drawn again. */
@@ -1187,8 +1245,10 @@ export class Game implements Shell {
     }
     this.prints.clear();
     this.hands.clear();
+    this.finger.clear();
     this.director.useScene(scene.camera);
     this.#settle();
+    this.photos.arrived(id, placeInfo(id).name, this.time);
     this.online?.arrived();
   }
 
@@ -1225,7 +1285,8 @@ export class Game implements Shell {
     } else {
       this.director.stopWallpaper();
       const view = this.hands.view;
-      this.director.setView(view === "eyes" ? "follow" : view === "inside" ? "close" : view);
+      // Why? leaves the camera where it is: the fly lives on behind it.
+      if (view !== "why") this.director.setView(view === "eyes" ? "follow" : view === "inside" ? "close" : view);
     }
   }
 
@@ -1292,15 +1353,19 @@ export class Game implements Shell {
     this.#copyEye();
     const holding = remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld);
     this.hands.update(dt, { use: false, holding: playing && holding, eye: this.#eye }, life.body, life.pantry);
+    this.#moveFinger(dt, playing);
     this.#held = this.hands.stroking || this.hands.blowing ? this.#held + dt : 0;
     if (this.#held > HOLD_TAUGHT) this.#learn(this.hands.current.id);
     this.#live(dt);
     this.#feel();
     this.eyes.beforeStep();
     life.step(dt, now);
+    this.#record(dt);
     this.#liveCompany(dt, now);
     this.tally.update(life, Date.now(), dt);
     if (this.remembered.due(dt)) this.#keepFlies();
+    this.photos.watch(life, dt, this.time, this.#here);
+    this.photos.update(dt);
     this.#reactions();
     this.#paddle(dt);
     const hands = this.hands;
@@ -1349,24 +1414,33 @@ export class Game implements Shell {
     }
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle, this.#middles);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
-    this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
+    // With the camera in hand, the hand is off the table.
+    this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper && this.hands.current.id !== "photo" ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
     this.#buildAim = playing ? this.#pointBuild() : null;
     this.kit.update(this.builder, this.#buildAim, this.hands.variant.id === "remove", this.handsView.opacity, this.time, stage.light, stage.weather, (stage.current.open ?? 1) >= 1);
+    this.fingerView.update(this.finger, this.#floorAt);
 
     this.#overlay(dt);
 
     // With the graphics context lost there is nothing to draw into: the fly lives on, unseen, until it is back.
     if (!this.glLost) {
       stage.beginFrame();
+      // A picture is of the world alone: the hand's ring is left out of the frame it is taken from.
+      const shot = this.photos.wants(this.time, this.#framed);
+      if (shot) this.handsView.hidePointer();
       stage.render(director.camera, dt);
+      if (shot) this.photos.shoot(stage.renderer, stage.frame.width, stage.frame.height, stage.frame.aspect, this.time, this.#here);
       this.touchLoupe?.update(stage.renderer, this.shape, this.#aim.x, this.#aim.y, this.devices.current === "touch" && this.#controls.holding && this.#aim.onWorld && playing);
       const showEyes = this.#showEyes();
+      const showWhy = this.#showWhy();
+      // Either fills the middle of the screen: the corner pictures make way.
+      const full = showEyes || showWhy;
       const screen = this.#loading ? "loading" : this.nav.current;
       const settings = this.settings;
-      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off" || brain.status !== "running");
-      const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, showEyes);
-      const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, showEyes);
+      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, full, this.eyes.detail === "off" || brain.status !== "running");
+      const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, full);
+      const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, full);
       this.#layCorners();
       this.corners.update(dt, eyesWanted === "show" || nervesNow === "show" || statsNow === "show", this.wallpaper, director.shotChanges);
       // What it sees takes the corner itself; its nervous system is next to it, or there when it isn't; the stats across from them, or under them. None comes in where another still shows.
@@ -1385,7 +1459,8 @@ export class Game implements Shell {
       stats.day = this.tally.day;
       stats.brain = life.brain.state;
       this.statsPanel.update(dt, waitFor(statsNow, this.corners, statsAt, this.statsPanel, pictures), this.corners, statsAt, opacity, stats);
-      this.eyes.render(dt, showEyes, this.hands.ball.active, this.inset.watching);
+      this.why.update(dt, showWhy);
+      this.eyes.render(dt, showEyes, this.hands.ball.active || this.finger.urgent(life.body.position), this.inset.watching);
       stage.renderer.render(this.overlay.scene, this.overlay.camera);
       if (!this.#ready) {
         // The TV's splash can give way once both the world and its loading panel are drawn.
@@ -1417,6 +1492,24 @@ export class Game implements Shell {
     this.fly.model.nerves.xray = this.xray.amount;
   }
 
+  /** What the followed fly's brain was told and answered this frame, kept for Why?. */
+  #record(dt: number) {
+    const { life } = this;
+    const r = this.#recorded;
+    r.regionRates = life.brain.regionRates;
+    r.state = life.brain.state;
+    r.sensed = life.sensed;
+    r.intent = life.intent;
+    r.onFeet = life.body.onFeet;
+    r.jumped = life.body.events.jumped;
+    this.recorder.record(dt, r);
+  }
+
+  /** The player is watching its last seconds played back. */
+  #showWhy() {
+    return this.hands.view === "why" && this.nav.current === "play" && !this.wallpaper && !this.#loading;
+  }
+
   /** The player is looking through the fly's eyes. */
   #showEyes() {
     return this.hands.view === "eyes" && this.nav.current === "play" && !this.wallpaper;
@@ -1435,7 +1528,7 @@ export class Game implements Shell {
     felt.air.x = 0;
     felt.air.y = 0;
     felt.air.z = 0;
-    felt.touch = 0;
+    felt.contacts.clear();
     felt.looming.length = 0;
     const live = this.stage.set.live;
     if (!live || this.#moving) return;
@@ -1479,7 +1572,7 @@ export class Game implements Shell {
       const c = list[i];
       const { life, felt, air } = c;
       felt.air.x = felt.air.y = felt.air.z = 0;
-      felt.touch = 0;
+      felt.contacts.clear();
       felt.looming.length = 0;
       set?.feel?.(dt, life.body.position, felt);
       air.x = felt.air.x;
@@ -1489,11 +1582,22 @@ export class Game implements Shell {
       if (stroked >= 1) hands.stroking = true;
       this.#companyStroke = Math.max(this.#companyStroke, stroked);
       const stimuli = life.stimuli;
-      stimuli.stroke = Math.max(stroked, this.bubbles.brushedBy[i], felt.touch, online?.reach(life.body, air) ?? 0);
+      // Where each touches it: the feather (this player's, or another's at a table), the fingertip, a bubble that burst on it, the place's raindrops.
+      const contacts = stimuli.contacts;
+      contacts.clear();
+      contacts.addAll(felt.contacts);
+      hands.touch(life.body, contacts);
+      this.finger.touch(life.body, contacts);
+      this.bubbles.touch(i + 1, contacts);
+      if (online) {
+        online.reach(life.body, air);
+        online.touch(life.body, contacts);
+      }
+      this.#carriedAir(life.body, air);
       stimuli.air = air;
       // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
       stimuli.looming.length = 0;
-      stimuli.looming.push(hands.looming[0]);
+      stimuli.looming.push(hands.looming[0], this.finger.looming);
       if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
       pushAll(stimuli.looming, felt.looming);
       if (online) pushAll(stimuli.looming, online.looming);
@@ -1509,21 +1613,50 @@ export class Game implements Shell {
     const hands = this.hands;
     const felt = this.#felt;
     const online = this.online;
-    // The feather (this player's, or another's at a table), a bubble that burst on it last frame, or something from the place itself (a raindrop).
-    stimuli.stroke = Math.max(hands.stroke, this.bubbles.brushed, felt.touch, online?.stroke ?? 0);
+    // Where each touches it: the feather (this player's, or another's at a table), the fingertip, a bubble that burst on it last frame, the place's raindrops.
+    const contacts = stimuli.contacts;
+    contacts.clear();
+    contacts.addAll(felt.contacts);
+    hands.touch(this.life.body, contacts);
+    this.finger.touch(this.life.body, contacts);
+    this.bubbles.touch(0, contacts);
+    online?.touch(this.life.body, contacts);
     // A puff from the player (and the others at a table) and the place's own air (a gust) together.
     const air = this.#puff;
     air.x = hands.air.x + felt.air.x + (online?.air.x ?? 0);
     air.y = hands.air.y + felt.air.y + (online?.air.y ?? 0);
     air.z = hands.air.z + felt.air.z + (online?.air.z ?? 0);
+    this.#carriedAir(this.life.body, air);
     stimuli.air = air;
-    // Things that could loom: the balls, the bubbles, and whatever comes by.
+    // Things that could loom: the balls, the fingertip, the bubbles, and whatever comes by.
     stimuli.looming.length = 0;
-    stimuli.looming.push(hands.looming[0]);
+    stimuli.looming.push(hands.looming[0], this.finger.looming);
     if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
     for (const l of felt.looming) stimuli.looming.push(l);
     if (online) for (const l of online.looming) stimuli.looming.push(l);
-    stimuli.threat = hands.ball.active ? hands.ball.position : (online?.threat ?? null);
+    stimuli.threat = hands.ball.active ? hands.ball.position : (this.finger.threat ?? online?.threat ?? null);
+  }
+
+  /**
+   * The fingertip's frame, before the flies live theirs: in hand while it is
+   * the tool in play; it goes where the hand is, and carries whichever of
+   * this device's flies stand on it.
+   */
+  #moveFinger(dt: number, playing: boolean) {
+    const bodies = this.#bodies;
+    bodies.length = 0;
+    bodies.push(this.life.body);
+    for (const c of this.company.list) bodies.push(c.life.body);
+    this.finger.update(dt, playing && this.hands.current.id === "finger" && !this.#moving, this.hands.pointer, this.life.body.position, bodies);
+  }
+
+  /** A fly the finger carries moves through the air at the finger's speed: the air moves past it the other way. */
+  #carriedAir(body: FlyBody, air: Vec3) {
+    const finger = this.finger;
+    if (!finger.carries(body)) return;
+    air.x -= finger.velocity.x;
+    air.y -= finger.velocity.y;
+    air.z -= finger.velocity.z;
   }
 
   #reactions() {
@@ -1678,7 +1811,7 @@ export class Game implements Shell {
     }
     if (playing && (remote.dx !== 0 || remote.dy !== 0)) {
       // With the View tool in hand the hand has nothing to do, so a swipe turns the camera, as a drag does.
-      if (this.hands.current.id === "view") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
+      if (this.hands.current.id === "view" || this.hands.current.id === "photo") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
       else this.#movePointer(remote.dx, remote.dy);
     }
     if (playing) this.#steer(dt);
@@ -1708,8 +1841,10 @@ export class Game implements Shell {
       if (pads.home) this.#home();
     }
     const turning = round !== 0 || up !== 0;
+    // Watching Why?, round goes through what was recorded instead, later the way the keys and the stick point (E, right).
+    if (turning && this.hands.view === "why") this.why.scrub((round * dt) / DRAG_ROUND);
     // Let go only when they are let go themselves: a finger or the mouse may be holding the camera too.
-    if (turning) {
+    else if (turning) {
       this.director.held = true;
       this.#turnCamera(round * dt, up * dt);
     } else if (this.#turning) this.director.held = false;
@@ -1717,9 +1852,15 @@ export class Game implements Shell {
     if (zoom !== 0) this.#zoomCamera(Math.exp(zoom * dt));
   }
 
-  /** The camera turned by hand, unless the player is looking through the fly's eyes, where there is no camera to turn. */
+  /**
+   * The camera turned by hand, unless the player is looking through the fly's
+   * eyes, where there is no camera to turn. Watching Why?, a drag or a swipe
+   * moves through what was recorded instead, later to the right: a drag the
+   * screen's width, the whole of it.
+   */
   #turnCamera(yaw: number, pitch: number) {
-    if (this.hands.view !== "eyes") this.director.turnBy(yaw, pitch);
+    if (this.hands.view === "why") this.why.scrub(-yaw / DRAG_ROUND);
+    else if (this.hands.view !== "eyes") this.director.turnBy(yaw, pitch);
   }
 
   /** The camera brought in or taken out by hand; the View tool shows the view it is nearest. */
@@ -1748,13 +1889,14 @@ export class Game implements Shell {
     this.#viewFollows();
   }
 
-  /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead. */
+  /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead, or, with the camera in hand, takes a photo. */
   #chooseTool(index: number) {
     const hands = this.hands;
     if (hands.chooseTool(index)) {
       this.#learn("tools");
       this.#changedAt = this.time;
-    } else if (index === hands.tool) {
+    } else if (index === hands.tool && hands.current.id === "photo") this.#snap();
+    else if (index === hands.tool) {
       // The one in hand again: what Select does with it, on the dial Select steps.
       const dial = hands.current.second ? 1 : 0;
       if (hands.stepVariant(1, true, dial)) this.#variantChanged(dial);
@@ -1774,9 +1916,40 @@ export class Game implements Shell {
       this.#build();
       return;
     }
+    if (hands.current.id === "photo") {
+      this.#snap();
+      return;
+    }
+    if (hands.current.id === "finger") {
+      this.finger.use();
+      this.#learn("finger");
+      return;
+    }
     this.#copyEye();
     hands.update(0, { use: true, holding: true, eye: this.#eye }, this.life.body, this.life.pantry);
     if (hands.events.blocked) this.#refuse();
+  }
+
+  /** Takes a photo of the world as the camera shows it now, for the journal. */
+  #snap() {
+    if (!this.photos.snap()) {
+      this.#refuse();
+      return;
+    }
+    this.#learn("photo");
+    this.haptics.feel("shutter");
+  }
+
+  /** Whether this frame shows the followed fly well enough for a first's picture: in front, clear of the edges, big enough to see, nothing fading over it. */
+  #framedWell(): boolean {
+    if (this.stage.veil > 0 || this.#moving || (typeof document !== "undefined" && document.hidden)) return false;
+    const camera = this.director.camera;
+    const p = this.fly.root.position;
+    const ndc = this.#ndc.set(p.x, p.y, p.z).project(camera);
+    if (!(ndc.z < 1 && Math.abs(ndc.x) < 0.8 && Math.abs(ndc.y) < 0.8)) return false;
+    const rows = worldSize(this.display.frame, this.stage.pixels).height;
+    const long = pixelsLong(camera, p, FLY_LENGTH, rows);
+    return long >= 12 && long <= rows * 0.8;
   }
 
   /** Carries the fly to the place chosen on the Place tool, if it isn't there; whether it went. */
@@ -1981,7 +2154,8 @@ export class Game implements Shell {
   /** Keeps the hand under a pointer that is still while the camera moves. */
   #followAim() {
     const aim = this.#aim;
-    if (!aim.active || this.nav.current !== "play" || this.wallpaper) return;
+    // The fingertip stays where it was put while the camera follows a fly it carries, or it would carry it on for ever.
+    if (!aim.active || this.nav.current !== "play" || this.wallpaper || this.hands.current.id === "finger") return;
     if (aim.moved) {
       aim.moved = false;
       return;
@@ -1994,7 +2168,15 @@ export class Game implements Shell {
   /** What is under a point on the screen: the fly, or the world, if anything is there. */
   #cast(x: number, y: number): RayHit | null {
     this.#ray.setFromCamera(this.#ndc2.set(x * 2 - 1, 1 - y * 2), this.director.camera);
-    return aimAt(this.life.world, this.#ray.ray.origin, this.#ray.ray.direction, this.life.body.position, this.#hit);
+    const world = this.life.world;
+    // The hand is never on the fingertip it holds: under it, on the table.
+    const present = world.movingPresent;
+    world.movingPresent = false;
+    // The fingertip goes where the hand points, not under the fly: under a fly it carries, it would follow the fly it moves.
+    const finger = this.hands.current.id === "finger";
+    const hit = finger ? world.raycast(this.#ray.ray.origin, this.#ray.ray.direction, this.#hit) : aimAt(world, this.#ray.ray.origin, this.#ray.ray.direction, this.life.body.position, this.#hit);
+    world.movingPresent = present;
+    return hit;
   }
 
   /** The system's cursor: none over the table (the hand is the cursor), a hand to grab the air with (it turns the camera), a pointing hand over things to press, else the arrow. */
@@ -2003,7 +2185,7 @@ export class Game implements Shell {
     if (this.devices.current === "mouse" && !this.#loading) {
       if (this.wallpaper) cursor = "none";
       else if (this.#controls.turning) cursor = "grabbing";
-      else if (this.nav.current === "play") cursor = !this.#aim.active ? "pointer" : this.#aim.onWorld ? "none" : "grab";
+      else if (this.nav.current === "play") cursor = !this.#aim.active || this.hands.current.id === "photo" ? "pointer" : this.#aim.onWorld ? "none" : "grab";
     }
     if (cursor === this.#cursor || !this.canvas.style) return;
     this.#cursor = cursor;
@@ -2021,6 +2203,11 @@ export class Game implements Shell {
         break;
       case "up":
       case "down":
+        // Framing a photo, Up brings the camera in and Down takes it out, held or pressed.
+        if (hands.current.id === "photo") {
+          this.#zoomCamera(button === "up" ? 1 / NOTCH_ZOOM : NOTCH_ZOOM);
+          break;
+        }
         // Up goes to the earlier kind in the list, as a list reads top to bottom.
         if (hands.stepVariant(button === "up" ? -1 : 1)) this.#variantChanged();
         else if (!repeat) this.#refuse();
@@ -2055,7 +2242,11 @@ export class Game implements Shell {
       this.#followLight();
       this.online?.chooseWorld(this.hands.timeOfDay, this.hands.weather);
     }
-    if (id === "view") this.#syncCamera();
+    if (id === "view") {
+      this.#syncCamera();
+      // Asked: what was kept until now, frozen while it plays.
+      if (this.hands.view === "why") this.why.open(this.recorder);
+    }
     // A table's light and weather aren't this player's own to come back to; in a room open to everyone they are.
     if (!this.online || this.online.everyone || id !== "sky") this.#remember(dial);
   }
@@ -2088,7 +2279,11 @@ export class Game implements Shell {
     ndc.x = Math.max(-0.97, Math.min(0.97, ndc.x + dx * SWIPE_GAIN));
     ndc.y = Math.max(-0.95, Math.min(0.9, ndc.y + dy * SWIPE_GAIN * 1.2));
     this.#ray.setFromCamera(this.#ndc2.set(ndc.x, ndc.y), camera);
-    const hit = this.life.world.raycast(this.#ray.ray.origin, this.#ray.ray.direction, this.#hit);
+    const world = this.life.world;
+    const present = world.movingPresent;
+    world.movingPresent = false;
+    const hit = world.raycast(this.#ray.ray.origin, this.#ray.ray.direction, this.#hit);
+    world.movingPresent = present;
     if (hit) this.hands.movePointer(hit.point, hit.normal);
   }
 
@@ -2126,6 +2321,7 @@ export class Game implements Shell {
       hud.changed = this.time - this.#changedAt;
       hud.brainRunning = this.brain.status === "running";
       hud.pressed = this.#controls.preview;
+      hud.shutter = this.photos.sinceShutter;
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
@@ -2136,7 +2332,7 @@ export class Game implements Shell {
       const k = this.#hudKey;
       const pressedChanged = k.pressed !== hud.pressed;
       const changed = pressedChanged || k.preview !== hud.previewTool || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
-      if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
+      if (changed || hud.changed < 0.3 || this.photos.sinceShutter < SHUTTER_FLASH + 0.05 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
         k.preview = hud.previewTool;
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
@@ -2200,6 +2396,17 @@ export class Game implements Shell {
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
     if (shown === "about") this.screens.about.publish(d);
+    if (shown === "journal") this.screens.journal.publish(d);
+    // The journal: whether it is open and taking a picture, and its entries, oldest first, each a first's key (or "photo"), "+" with a picture.
+    d.photos = this.photos.state;
+    d.photosMs = this.photos.costMs.toFixed(1);
+    d.photosShots = String(this.photos.shots);
+    const journal = this.photos.journal;
+    if (journal && journal.changes !== this.#journalSeen) {
+      this.#journalSeen = journal.changes;
+      d.journal = journal.entries.map((e) => `${e.key || "photo"}${e.size ? "+" : ""}`).join(" ");
+      d.pictures = String(journal.entries.filter((e) => e.size).length);
+    }
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;
@@ -2215,9 +2422,20 @@ export class Game implements Shell {
     // The Sky's two dials, chosen: the time of day and the weather.
     d.sky = `${this.hands.timeOfDay}/${this.hands.weather}`;
     d.pointer = this.hands.following ? "following" : "free";
-    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
+    // The fingertip: away, raised or down; how high its underside is over what is under it (mm), its speed (mm/s), and how many flies stand on it.
+    const finger = this.finger;
+    d.finger = finger.state;
+    d.fingerHeight = finger.present ? (finger.tip.y - finger.floor).toFixed(2) : "";
+    d.fingerSpeed = finger.speed.toFixed(0);
+    d.fingerCarrying = String(finger.carried);
+    d.onFinger = finger.carries(life.body) ? "yes" : "";
+    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${life.senses.touched.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
-    d.touch = s.touch.toFixed(3);
+    // How hard it is touched, wherever, and the parts it is touched on, as the brain is told them.
+    d.touch = life.senses.touched.toFixed(3);
+    let parts = "";
+    for (const part of TOUCH_PARTS) if ((s[part] ?? 0) > 0) parts += `${parts ? " " : ""}${part.slice(5)} ${(s[part] ?? 0).toFixed(2)}`;
+    d.touched = parts;
     d.wind = s.wind.toFixed(3);
     d.sweet = s.sweet.toFixed(3);
     d.eaten = life.eaten.toFixed(3);
@@ -2294,6 +2512,15 @@ export class Game implements Shell {
       .map((c, i) => `${c.id}:${c.life.brain.status}:${c.life.activity}:${c.life.body.position.x.toFixed(2)},${c.life.body.position.z.toFixed(2)}:${this.eyes.companyUpdates(i)}:${c.life.crowd.count}:${c.colour}`)
       .join(";");
     d.view = this.hands.view;
+    // Why?, as shown: what it plays back, the neurons and commands marked, the senses and input regions picked out, and where it is from when the body acted (s).
+    const why = this.why.why;
+    const replaying = this.why.mesh.visible;
+    d.why = replaying ? (why.action ?? "nothing") : "";
+    d.whyNeurons = replaying ? why.groups.map((g) => SOMA_GROUPS[g].rate).join(",") : "";
+    d.whyCommands = replaying ? why.commands.map((c) => COMMAND_ORDER[c]).join(",") : "";
+    d.whySenses = replaying ? why.senses.map((s) => SENSES[s][0]).join(",") : "";
+    d.whyRegions = replaying ? why.regions.map((r) => REGIONS[r].id).join(",") : "";
+    d.whyAt = replaying ? this.why.at.toFixed(2) : "";
     d.place = this.#here;
     // Where it lives, and the series of rooms open to everyone it is visiting (-1 at home).
     d.home = this.settings.place;

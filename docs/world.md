@@ -4,8 +4,8 @@
 
 The place catalog includes Picnic table, Windowsill, Lab bench,
 Greenhouse, Restaurant and Kitchen counter (`apps/web/src/places/catalog.ts`). Greenhouse adds
-a bench with pots, seed trays, fruit and a water saucer; its saucer water has
-configured sweetness 0.05 (`packages/world/src/greenhouse.ts`).
+a bench with pots, seed trays, fruit and a water saucer of plain water
+(`packages/world/src/greenhouse.ts`).
 
 The fly can live in more than one place (`docs/places.md`), and the one it
 lives in is its home: every launch finds it there, and play is there. At
@@ -290,6 +290,201 @@ the rain and take the snow, and the gull's shadow passes over them;
 indoors they stay dry, as the rooms' own things do. Nothing about them
 reaches the brain except through what it sees, feels and tastes.
 
+## Food
+
+Each place has food of its own, eaten down and slowly coming back, and Feed
+drops more (`packages/world/src/pantry.ts`). Every food tastes of sugar,
+plain water or bitterness, each 0 to 1, which reach the brain as `sweet`,
+`water` and `bitter` ([the fly's senses](simulation.md#the-flys-senses)):
+each drives its taste neurons at that fraction of their most
+([the brain's senses](../packages/brain/README.md#senses)). So each food's
+taste is how hard a fly's taste neurons answer it, as a fraction of the most
+they answer, worked out the same way for every food from what it is made of
+(`packages/world/src/tastes.ts`):
+
+- **What it holds.** Its water, sugars and caffeine in 100 g, from USDA
+  FoodData Central (each entry's ID is in `packages/world/src/tastes.ts`). Where an entry doesn't
+  split its sugars, they are split as the nearest entry that does (raw figs as
+  dried figs', toast as bread's), or taken as sucrose where the food is far
+  past 1 M (jam, hard sweets), which changes nothing (below). Foods made of
+  others are mixed from them: the coulis is raspberry purée with sugar, the
+  lab's fly food the stock center's cornmeal and molasses recipe, its agar a
+  published grape juice agar, the espresso dregs and Bitter sugar sugar soaked
+  in espresso. The syrups are maple syrup (FoodData Central has no coffee
+  syrup), the tart's pastry and the picnic's biscuit shortbread.
+- **What the fly tastes it in.** A fly tastes what is dissolved, with sensilla
+  at the tips of its labellum and feet, so a food is its sugar dissolved in its
+  own water: a raspberry's 4.4 g of sugar in its 86 g of water, 0.27 M, mostly
+  fructose and glucose. A food with less water than dissolves its sugar (sugar,
+  honey, sweets, cake, a dried juice ring) is a saturated solution at its
+  surface, as a fly's saliva on dry sugar makes one. Concentrations are per
+  litre of the solution (the water and the sugar's own volume).
+- **Sweet.** The labellum's sugar-sensing neuron, recorded from its L-type
+  sensilla at 10 mM to 1 M of sucrose, glucose and fructose (Hiroi,
+  Marion-Poll & Tanimura 2002, Zool Sci 19:1009, Figure 6, read off the
+  figure): the one study to record all three from the same sensilla the same
+  way. Between recordings it is interpolated on a log scale; past 1 M it holds,
+  since none falls off by then. 1 is the most any sugar drove it to (84
+  spikes/s, glucose at 1 M): sucrose at 1 M is 0.98, which is a lump of sugar.
+  Sugars mixed are taken to add as each standing in for as much of another as
+  gives the same answer (not recorded). Maltose, galactose and lactose weren't
+  recorded and drive nothing.
+- **Bitter.** Caffeine's answer from the bitter neurons at 1, 3 and 10 mM
+  (Dweck, Sang & Carlson 2021, eLife 10:e64317, the only series across
+  concentrations found), over 10 mM's, which is an espresso's and the scale's 1.
+  Below 1 mM, where the threshold lies for most bitter compounds (Weiss et al.
+  2011, Neuron 69:258), nothing is assumed: cola's 0.5 mM tastes of none.
+  Chocolate's theobromine drives the bitter neurons at no concentration
+  recorded (ibid.).
+- **Water.** The water-sensing neurons answer sugar up to 0.2 M as they do
+  water, and a third as much by 0.5 to 1 M (Cameron et al. 2010, Nature 465:91,
+  Figure 1e, calcium imaging). Past 1 M nothing was recorded for sugar, and a
+  food tastes of none (in the same figure 1 M of salt takes them to a sixth).
+  Only sugar is counted, so for coffee, lemon and the like it is an upper bound.
+
+| Food | Before (sweet / water / bitter) | Now | Sugar in its water |
+|---|---|---|---|
+| Sugar (Feed), sugar and spilt sugar | 1 / 0 / 0 | 0.98 / 0 / 0 | saturated (2.6 M) |
+| Honey | 1 / 0 / 0 | 1 / 0 / 0 | saturated |
+| Raspberry (Feed) | 0.8 / 0 / 0 | 0.73 / 0.94 / 0 | 0.27 M |
+| Water: Feed's, the saucers | 0 / 1 / 0 (the greenhouse's 0.05 sweet) | 0 / 1 / 0 | none |
+| Coffee (Feed) | 0 / 0 / 1 | 0 / 1 / 1 | none; 11 mM of caffeine |
+| Bitter sugar (Feed), the espresso's dregs | 1 / 0 / 0.5; 0.9 / 0 / 1 | 0.98 / 0 / 0.85 | saturated; 4.9 mM of caffeine |
+| jam | 0.95 / 0 / 0 | 0.98 / 0 / 0 | saturated |
+| strawberry juice | 0.8 and 0.7 / 0 / 0 | 0.73 / 0.93 / 0 | 0.28 M |
+| lemonade | 0.7, 0.65 / 0 / 0 | 0.93 / 0.37 / 0 | 0.55 M |
+| orange | 0.6 / 0 / 0 | 0.89 / 0.63 / 0 | 0.40 M |
+| orange juice | 0.6 to 0.7 / 0 / 0 | 0.88 / 0.71 / 0 | 0.36 M |
+| juice ring (dried orange juice) | 0.55 / 0 / 0 | 1 / 0 / 0 | saturated |
+| banana | 0.9, 0.95 / 0 / 0 | 0.98 / 0.36 / 0 | 0.75 M |
+| peach, peach juice | 0.85 to 0.9 / 0 / 0 | 0.89 / 0.72 / 0 | 0.36 M |
+| plum juice | 0.8 / 0 / 0 | 0.97 / 0.37 / 0 | 0.54 M |
+| grape juice | 0.8 / 0 / 0 | 0.98 / 0.35 / 0 | 0.84 M |
+| grape | 0.85 / 0 / 0 | 0.98 / 0.34 / 0 | 0.95 M |
+| tomato juice | 0.72 / 0 / 0 | 0.58 / 1 / 0 | 0.15 M |
+| fig flesh | 0.95 / 0 / 0 | 0.98 / 0 / 0 | 1.01 M |
+| grape agar | 0.75 / 0 / 0 | 0.7 / 0.99 / 0 | 0.25 M |
+| fly food | 0.85 / 0 / 0 | 0.83 / 1 / 0 | 0.22 M |
+| ketchup | 0.6 / 0 / 0 | 0.99 / 0 / 0 | 1.37 M |
+| bread crumbs (restaurant) | 0.3 / 0 / 0 | 0.85 / 0.36 / 0 | 0.68 M |
+| toast crumbs (kitchen) | 0.25 / 0 / 0 | 0.94 / 0.35 / 0 | 0.86 M |
+| lemon | 0.3 / 0 / 0 | 0.63 / 1 / 0 | 0.14 M |
+| syrup | 0.95, 0.8 / 0 / 0 | 0.98 / 0 / 0 | saturated |
+| cake crumbs | 1 / 0 / 0 | 0.98 / 0 / 0 | saturated |
+| coulis | 1 / 0 / 0 | 0.97 / 0.35 / 0 | 0.88 M |
+| tart crumbs, biscuit crumb (found) | 1, 0.5 / 0 / 0 | 0.98 / 0 / 0 | saturated |
+| mints | 0.6 / 0 / 0 | 0.98 / 0 / 0 | saturated |
+| soda (cola) | 0.9 / 0 / 0 | 0.88 / 0.37 / 0 | 0.58 M; 0.5 mM of caffeine |
+
+A raspberry is less sweet than an orange now, as its sugar is; bread, toast,
+ketchup, the mints and the lemon are sweet, since what decides it is how
+strong the sugar is in the water it is dissolved in, and bread holds little
+water. Dilute juices and fruit taste of water too, which takes something off
+sugar's answer in the brain (`packages/brain/README.md`, Senses), and a food's
+water stands in for how much it quenches
+([thirst](simulation.md#the-flys-senses)).
+
+What it leaves out, and where it could be wrong:
+
+- **Fructose and glucose.** Other recordings find the labellum's sugar neuron
+  answering fructose and glucose far more weakly than sucrose (Dahanukar et al.
+  2007, Neuron 56:503; Jiao et al. 2008, Curr Biol 18:1797), and how strongly
+  it answers fructose differs between strains (Uchizono & Tanimura 2017, Chem
+  Senses 42:287). Hiroi et al.'s flies answer both well; with those others'
+  numbers, fruit, juice and bread would be much less sweet. One study is used
+  so that every sugar is measured the same way.
+- **Below 10 mM and past 1 M**, and how sugars mixed add: not recorded.
+- **The other sensilla and organs.** `sweet` drives the taste pegs' and
+  pharynx's sugar neurons too, taken to answer as the labellum's L-type
+  sensilla do; nothing records theirs across concentrations.
+- **Acid and salt.** Acids drive the bitter neurons and quiet the sugar ones,
+  more the lower the pH (Charlu et al. 2013, Nat Commun 4:2042), and high salt
+  drives the bitter neurons too (Jaeger et al. 2018, eLife 7:e37167, by
+  calcium imaging). Both were recorded without sugar, and in the same study more
+  sugar overcame acid's quieting of the sugar neurons; what a fruit's acid does
+  to its bitterness with its sugar there isn't recorded, so neither is counted:
+  a lemon's citric acid and ketchup's salt taste of nothing here.
+- **Water** counts only a food's sugar, and drops to none past 1 M, where
+  nothing was recorded: the fig, at 1.01 M, tastes of none, the grape, at
+  0.95, of a third.
+- **How well a food feeds** (hunger) still follows its `sweet`, a game unit
+  (`packages/body/src/hunger.ts`).
+
+Whether the fly eats is the brain's. `node scripts/foods.ts` sets a fly down
+with its mouth on each food (each place's own as it lies, Feed's on a bare
+table), at a new fly's hunger and starved, and watches ten seconds, seeds 1
+to 3:
+
+- **Eaten as before**: sugar, honey, jam, the syrups, cake, tart and figs,
+  every time, 8.5 to 10 s of the ten; and never plain water, Coffee, Bitter
+  sugar or the espresso's dregs (sweet as they are, 0.85 bitter is past where
+  the brain's taste stops feeding).
+- **Eaten much more**: whatever holds its sugar in little water. The bread and
+  toast crumbs, which no new fly ate, every fly now eats for 5 to 9 s; ketchup,
+  the mints, the dried juice ring, the orange, orange juice and lemonade, once
+  taken for a second or two, for 4 to 9 s.
+- **Eaten much less**: the dilute ones, sweet at 0.7 or so and tasting of water
+  as much as of sugar, which takes from sugar's answer. Feed's Raspberry and
+  the picnic's strawberry juice are taken by every fly, but a new fly feeds 0.3
+  to 2 s of the ten (4 to 7 before) and a starved one 2.4 to 3.2 (6 to 9); the
+  lab's agar and fly food likewise. The greenhouse's tomato juice (0.58) is all
+  but left: two new flies in three and one starved fly took it, for under a
+  second. The lemon (0.63) is as it was, a moment's taste for one or two flies
+  in three.
+
+| Food | New fly (hunger 0.7): ate; seconds fed, before → now | Starved (1) |
+|---|---|---|
+| Feed: Sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.1 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| Feed: Honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
+| Feed: Raspberry | 3/3, 4.1–6.8 s → 3/3, 0.3–1.1 s | 3/3, 6.3–8.7 s → 3/3, 2.4–2.9 s |
+| Feed: Water | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
+| Feed: Coffee | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
+| Feed: Bitter sugar | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
+| greenhouse: tomato juice | 3/3, 3.1–5.4 s → 2/3, 0.0–0.7 s | 3/3, 3.6–5.9 s → 1/3, 0.0–0.4 s |
+| greenhouse: fig flesh | 3/3, 7.2–9.3 s → 3/3, 8.7–9.2 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
+| greenhouse: water | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
+| picnic: honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
+| picnic: jam | 3/3, 7.2–9.3 s → 3/3, 8.7–9.2 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
+| picnic: strawberry juice (and the 0.7 bruise) | 3/3, 4.1–6.8 s → 3/3, 0.6–2.2 s | 3/3, 6.4–8.7 s → 3/3, 2.4–3.2 s |
+| picnic: lemonade | 3/3, 1.6–4.2 s → 3/3, 7.1–8.7 s | 3/3, 4.9–5.9 s → 3/3, 8.8–9.7 s |
+| picnic: orange | 3/3, 0.0–0.9 s → 3/3, 5.7–6.9 s | 3/3, 2.2–2.7 s → 3/3, 7.6–8.4 s |
+| picnic: sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| picnic: spilt sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| windowsill: banana | 3/3, 7.1–8.9 s → 3/3, 7.4–9.0 s | 3/3, 8.2–9.5 s → 3/3, 8.6–9.7 s |
+| windowsill: peach juice | 3/3, 4.9–8.0 s → 3/3, 3.7–6.5 s | 3/3, 7.7–8.8 s → 3/3, 7.8–8.9 s |
+| windowsill: plum juice | 3/3, 4.1–6.8 s → 3/3, 6.9–8.9 s | 3/3, 6.4–8.7 s → 3/3, 8.7–9.7 s |
+| windowsill: honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
+| windowsill: orange juice | 3/3, 0.0–0.9 s → 3/3, 4.1–6.8 s | 3/3, 1.8–2.7 s → 3/3, 5.9–9.1 s |
+| windowsill: water | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
+| windowsill: spilt sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| lab: grape agar | 3/3, 3.7–5.4 s → 3/3, 0.3–2.0 s | 3/3, 4.8–8.0 s → 3/3, 1.3–2.9 s |
+| lab: fly food | 3/3, 4.9–8.0 s → 3/3, 1.5–4.4 s | 3/3, 7.7–8.8 s → 3/3, 3.8–7.4 s |
+| restaurant: sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| restaurant: orange juice | 3/3, 1.6–4.2 s → 3/3, 4.1–6.8 s | 3/3, 4.9–5.9 s → 3/3, 5.9–9.1 s |
+| restaurant: juice ring | 1/3, 0.0–0.9 s → 3/3, 8.5–9.3 s | 3/3, 1.3–1.8 s → 3/3, 8.5–9.8 s |
+| restaurant: ketchup | 3/3, 0.0–0.9 s → 3/3, 6.5–9.6 s | 3/3, 1.8–2.7 s → 3/3, 7.9–9.5 s |
+| restaurant: crumbs | 0/3, 0.0 s → 3/3, 5.3–6.5 s | 1/3, 0.0–0.3 s → 3/3, 5.6–8.2 s |
+| restaurant: espresso | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
+| restaurant: peach | 3/3, 7.1–8.9 s → 3/3, 3.7–6.5 s | 3/3, 8.2–9.5 s → 3/3, 7.8–8.9 s |
+| restaurant: lemon | 0/3, 0.0 s → 1/3, 0.0–0.5 s | 1/3, 0.0–0.3 s → 2/3, 0.0–0.4 s |
+| restaurant: lemonade | 3/3, 1.0–3.4 s → 3/3, 7.1–8.7 s | 3/3, 3.1–5.3 s → 3/3, 8.8–9.7 s |
+| restaurant: syrup | 3/3, 7.2–9.3 s → 3/3, 8.7–9.2 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
+| restaurant: cake crumbs | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| restaurant: coulis | 3/3, 8.5–9.3 s → 3/3, 7.5–9.1 s | 3/3, 8.5–9.8 s → 3/3, 8.8–9.8 s |
+| restaurant: tart crumbs | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| restaurant: mints | 3/3, 0.0–0.9 s → 3/3, 8.7–9.2 s | 3/3, 1.8–2.7 s → 3/3, 9.2–9.9 s |
+| restaurant: soda | 3/3, 7.1–8.9 s → 3/3, 6.6–7.5 s | 3/3, 8.2–9.5 s → 3/3, 7.8–9.0 s |
+| restaurant: grape | 3/3, 4.9–8.0 s → 3/3, 8.7–8.9 s | 3/3, 7.7–8.8 s → 3/3, 9.3–9.9 s |
+| kitchen: banana | 3/3, 7.1–9.3 s → 3/3, 7.4–9.0 s | 3/3, 9.6–9.9 s → 3/3, 8.6–9.7 s |
+| kitchen: peach juice | 3/3, 7.1–8.9 s → 3/3, 3.7–6.5 s | 3/3, 8.2–9.5 s → 3/3, 7.8–8.9 s |
+| kitchen: grape juice | 3/3, 4.1–6.8 s → 3/3, 7.2–9.9 s | 3/3, 6.3–8.7 s → 3/3, 8.8–9.7 s |
+| kitchen: orange juice | 3/3, 1.0–3.4 s → 3/3, 4.1–6.8 s | 3/3, 3.1–5.3 s → 3/3, 5.9–9.1 s |
+| kitchen: honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
+| kitchen: crumbs | 0/3, 0.0 s → 3/3, 7.1–9.1 s | 0/3, 0.0 s → 3/3, 9.2–9.9 s |
+
+(Before: the hand-set tastes, at the commit before these; now: these, on
+it. "3/3" with 0.0 s means a bite in the last frame.)
+
 ## Footprints
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves
@@ -297,8 +492,8 @@ footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
 its feet, each where its gait set that foot down, lying on whatever it walks
 on (the table, a fruit, a jar's rim, the sill). Honey and plain syrup leave them amber; jam,
 raspberry red; the juices, lemonade, the agar and the
-lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
-or dew) leaves darker wet prints that dry in about half a minute; sticky ones
+lab's fly food their own colours; Bitter sugar, the espresso's dregs' brown. Water (dropped, the basil's saucer, a drop
+or dew) and Coffee leave darker wet prints that dry in about half a minute; sticky ones
 fade over a minute and a half. A foot carries only a little: the first steps
 off the food print clearly, the next fainter and then only now and then, and
 after ten or so it is clean, until it walks back into food. Sugar and crumbs

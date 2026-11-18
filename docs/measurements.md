@@ -16,6 +16,7 @@ current performance claim.
 | [Native brain speed and memory](../packages/brain-native/README.md#speed-and-memory) | `7d452a3`, 16 November 2026 | Apple M5 Pro, one thread, release C++; TV figures there are estimates |
 | [Neuron engine](../packages/brain/README.md#neuron-model), [region cost](../packages/brain/README.md#cost) | `11f3a15`, 16 November 2026 | M5 Pro; workloads are described; scripts supply default seeds, while capture seeds were not recorded |
 | [Fly update cost](../packages/fly/README.md) | `d91c8dd`, 16 November 2026 | Node with JIT and V8 interpreter; exact machine not recorded |
+| [Phototaxis](simulation.md#a-light-on-the-table) | `f8a9225` with `scripts/phototaxis.ts`, 17 November 2026 | Apple M5 Pro, Node 26.12.0, shared with other work (load 8 to 31); seeds and setups are in the table |
 
 [Apple TV](apple-tv.md#checking-it-1) and [iOS](ios.md) retain their own dated,
 named-device measurements. CPU budget thresholds are separate from historical

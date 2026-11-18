@@ -5,9 +5,10 @@
 // --hunger sends that hunger with every tick (BrainSenses.hunger); left out,
 // the brain is what it was before it had a hunger.
 //
-// (a) the response matrix: each sense alone at full strength for 1 s, and
-//     rest, with every command's mean and peak and the latency to its peak,
-//     then the game's fallback looming pulse;
+// (a) the response matrix: each sense alone at full strength for 1 s (and
+//     each part of the body touched alone), and rest, with every command's
+//     mean and peak and the latency to its peak, then the game's fallback
+//     looming pulse;
 // (b) seizure recovery: every sense, every pair and all at once at full
 //     strength for 2 s, then back to rest;
 // (c) behaviour at rest over --minutes of fly time, through the diagnostic observer;
@@ -27,6 +28,7 @@ import { BehaviorObserver } from "../src/observer.ts";
 import { FlyBrain } from "../src/runtime.ts";
 import { RESTING_SENSES as WITHOUT_HUNGER } from "../src/types.ts";
 import type { BrainCommand, BrainSenses } from "../src/types.ts";
+import { TOUCH_SENSES } from "../src/io.ts";
 import type { ScalarSense } from "../src/io.ts";
 import { BATTERY, facetAngles, render } from "../src/stimuli.ts";
 import type { Scene, Stimulus } from "../src/stimuli.ts";
@@ -79,8 +81,12 @@ console.log(`Fly brain report: ${connectome.neurons.toLocaleString("en-US")} neu
 // (a) The response matrix.
 console.log("\n(a) Response matrix. 2 s of rest, then 1 s of the sense at full strength (or nothing, for rest).");
 console.log("    Each cell: mean / peak over that second, and ms from onset to the peak (- when it never rises above 0.05).");
-console.log(`    ${pad("", 10)}${COMMANDS.map((c) => pad(c, 20)).join("")}`);
-const cases: [string, BrainSenses][] = [["rest", RESTING_SENSES], ...(Object.keys(FULL) as (ScalarSense)[]).map((k) => [label(k), apply([k])] as [string, BrainSenses])];
+console.log(`    ${pad("", 20)}${COMMANDS.map((c) => pad(c, 20)).join("")}`);
+const cases: [string, BrainSenses][] = [
+  ["rest", RESTING_SENSES],
+  ...(Object.keys(FULL) as ScalarSense[]).map((k) => [label(k), apply([k])] as [string, BrainSenses]),
+  ...TOUCH_SENSES.map((k) => [k, { ...RESTING_SENSES, [k]: 1 }] as [string, BrainSenses]),
+];
 const rateLines: string[] = [];
 for (const [name, senses] of cases) {
   const b = brain();
@@ -104,8 +110,8 @@ for (const [name, senses] of cases) {
     for (const [k, v] of Object.entries(stats.rates)) if (!k.startsWith("region.")) rates[k] = (rates[k] ?? 0) + v;
   }
   const cells = COMMANDS.map((c) => pad(`${fixed(sum[c] / n)} /${fixed(peak[c])} ${Math.abs(peak[c]) > 0.05 ? String(at[c]).padStart(4) : "   -"}`, 20));
-  console.log(`    ${pad(name, 10)}${cells.join("")}`);
-  rateLines.push(`    ${pad(name, 10)}${Object.entries(rates).map(([k, v]) => `${k} ${(v / n).toFixed(1)}`).join(", ")}`);
+  console.log(`    ${pad(name, 20)}${cells.join("")}`);
+  rateLines.push(`    ${pad(name, 20)}${Object.entries(rates).map(([k, v]) => `${k} ${(v / n).toFixed(1)}`).join(", ")}`);
 }
 console.log("\n    Mean readout rates over the same second, Hz:");
 for (const line of rateLines) console.log(line);
@@ -211,14 +217,15 @@ let bandHigh: number;
   console.log("\n(d) Wall time per simulated second, one thread, 10 s each after 2 s of rest:");
   const rows: [string, BrainSenses][] = [
     ["rest", RESTING_SENSES],
-    ["the feather resting on the fly (touch 0.4)", { ...RESTING_SENSES, touch: 0.4 }],
+    ["the feather resting on its back (notum 0.29, wings 0.16)", { ...RESTING_SENSES, touchNotum: 0.29, touchWings: 0.16 }],
+    ["touched all over (touch 0.4)", { ...RESTING_SENSES, touch: 0.4 }],
     ["a full looming pulse every second", RESTING_SENSES],
     ["touch and wind while airborne (touch 1, wind 0.5)", { ...RESTING_SENSES, touch: 1, wind: 0.5, grounded: false }],
     ["everything at once at full strength", apply(Object.keys(FULL) as (ScalarSense)[])],
   ];
   for (const [name, senses] of rows) {
     const seconds = name.startsWith("a full looming") ? loomEverySecond() : cost(senses);
-    console.log(`    ${pad(name, 48)} ${seconds.toFixed(3)} s`);
+    console.log(`    ${pad(name, 58)} ${seconds.toFixed(3)} s`);
   }
 }
 

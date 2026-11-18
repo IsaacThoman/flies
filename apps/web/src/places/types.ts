@@ -4,7 +4,7 @@
 // built from that same description so that what is drawn is what is felt.
 
 import type * as THREE from "three";
-import type { Looming } from "@fly/body";
+import type { Contacts, Looming } from "@fly/body";
 import type { Food, Pantry, Place, Vec3, World } from "@fly/world";
 import type { Shot } from "../cameraman.ts";
 import type { Daylight, Palettes } from "../scene/light.ts";
@@ -91,8 +91,8 @@ export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly
 export type Felt = {
   /** The air's own velocity at the fly, mm/s (a gust): felt as wind, and it carries the fly in flight as a puff does. */
   air: Vec3;
-  /** Something landing on it (a raindrop), 0 to 1, this frame: felt as touch. */
-  touch: number;
+  /** Something landing on it (a raindrop) this frame, where and how hard: felt as touch there. */
+  contacts: Contacts;
   /** Things it could see coming, for a brain without eyes (with eyes, it sees whatever is in `seen`). */
   looming: Looming[];
 };

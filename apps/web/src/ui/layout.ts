@@ -67,8 +67,12 @@ export type HudLayout = {
 const SHELF_GAP = 52;
 const SHELF_APART = 32;
 const SHELF_APART_LEAST = 12;
-/** Narrower than this a slot (design units, about 40 CSS pixels on a phone), a finger can't tell the tools apart: the halves go one over the other, the fly's over its world's. */
-const STACK_UNDER = 32;
+/** The widest the TV's shelf gets: its eight tools as they always were, clear of the pictures in the bottom corners. More come closer. */
+const SHELF_MOST = 8 * SHELF_GAP + SHELF_APART;
+/** Narrower than this a slot (design units, about 42 CSS pixels on a phone), a finger can't tell the tools apart: the halves go one over the other, the fly's over its world's. */
+const STACK_UNDER = 34;
+/** Where the fly's row starts at the least, beside the menu's button, when the halves are one over the other (design units from the safe area's left). */
+const MENU_CLEAR = 60;
 /** Rows of the shelf, middle to middle, when its halves are one over the other: its glass and a little between. */
 const SHELF_ROW = 58;
 /**
@@ -92,13 +96,14 @@ export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pic
   const touchApart = Math.min(SHELF_APART, a.w - 16 - tools * (44 / frame.unit));
   let apart = frame.coarse ? (a.w > a.h * 1.2 && frame.unit > 1.25 ? Math.max(SHELF_APART, a.w - 16 - tools * SHELF_GAP) : touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : halves ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
   if (!halves) apart = 0;
-  const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : SHELF_GAP;
+  const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : frame.coarse ? SHELF_GAP : Math.min(SHELF_GAP, Math.floor((SHELF_MOST - apart) / tools));
   let gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
   // Too many for one row a finger can use: the fly's tools over its world's, each row as wide as it needs.
   const stacked = halves && !compact && gap < STACK_UNDER;
   if (stacked) {
     apart = 0;
-    gap = Math.min(SHELF_GAP, (a.w - 16) / Math.max(split, tools - split));
+    // As wide as the wider row allows, and the fly's row, beside the menu's button, no wider than the room right of it.
+    gap = Math.min(SHELF_GAP, (a.w - 16) / Math.max(split, tools - split), (a.w - 8 - MENU_CLEAR) / split);
   }
   const shelfY = bottom - 34;
   const topRow = stacked ? shelfY - SHELF_ROW : shelfY;
@@ -116,7 +121,8 @@ export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pic
     groups.push({ x: left - 8, y: y - 26, w: (to - from) * gap + 16, h: 52 });
   };
   if (stacked) {
-    group(0, split, cx - (split * gap) / 2, topRow);
+    // The menu's button is beside the fly's row, in reach of a thumb: the row keeps clear of it.
+    group(0, split, Math.min(a.x + a.w - 8 - split * gap, Math.max(cx - (split * gap) / 2, a.x + MENU_CLEAR)), topRow);
     group(split, tools, cx - ((tools - split) * gap) / 2, shelfY);
   } else if (apart > 0) {
     group(0, split, shelfLeft, shelfY);
@@ -125,12 +131,12 @@ export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pic
   const shelfRect = { x: Math.min(...groups.map((r) => r.x)), y: topRow - 26, w: 0, h: shelfY - topRow + 52 };
   shelfRect.w = Math.max(...groups.map((r) => r.x + r.w)) - shelfRect.x;
   const menuAtFoot = frame.coarse;
-  const menuBeside = menuAtFoot && a.w * frame.unit >= 375;
+  const menuBeside = menuAtFoot && !stacked && a.w * frame.unit >= 375;
   const touch = frame.coarse ? {
     labelCx: compact ? (shelfLeft + shelfWidth + 16 + a.x + a.w - 8) / 2 : cx + (menuBeside ? 28 : 0),
     labelWidth: compact ? a.x + a.w - 8 - (shelfLeft + shelfWidth + 16) : a.w - 16 - (menuBeside ? 56 : 0),
     labelY: compact ? shelfY : labelY,
-    menuY: compact ? shelfY - 52 : labelY - (menuBeside ? 0 : 45),
+    menuY: compact ? shelfY - 52 : stacked ? topRow : labelY - (menuBeside ? 0 : 45),
     menuAtFoot,
     targetHeight: Math.max(32, 44 / frame.unit),
   } : null;

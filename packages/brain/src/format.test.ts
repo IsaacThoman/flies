@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CATEGORY_NAMES, CONNECTOME_VERSION, ConnectomeFormatError, FLYEM_MALE_CNS, loadConnectome, writeConnectome } from "./format.ts";
-import type { CategoryName, ConnectomeData } from "./format.ts";
+import type { CategoryName, ConnectomeData, NeuronQuery } from "./format.ts";
 
 function columns(codes: Record<CategoryName, number[]>, tables: Record<CategoryName, string[]>) {
   const out = {} as ConnectomeData["columns"];
@@ -87,6 +87,41 @@ test("queries find neurons by column", () => {
   assert.equal(c.indexOf(20000), 2);
   assert.equal(c.indexOf(4294967295), 3);
   assert.equal(c.indexOf(10002), -1);
+});
+
+test("queries find what a check of every neuron finds, however many codes and neurons match", () => {
+  // Enough neurons, and codes skewed enough, that a query's narrowest condition
+  // is sometimes one code, sometimes a few, and sometimes most of the brain.
+  let seed = 7;
+  const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32);
+  const n = 5000;
+  const tables = Object.fromEntries(CATEGORY_NAMES.map((name) => [name, Array.from({ length: name === "type" ? 300 : 6 }, (_, k) => `${name}${k}`)])) as Record<CategoryName, string[]>;
+  const codes = Object.fromEntries(CATEGORY_NAMES.map((name) => [name, Array.from({ length: n }, () => Math.floor(tables[name].length * random() ** 3))])) as Record<CategoryName, number[]>;
+  const c = loadConnectome(copy(writeConnectome({ synapses: 0, rootId: Uint32Array.from({ length: n }, (_, i) => i + 1), ptr: new Uint32Array(n + 1), post: new Uint32Array(0), count: new Uint16Array(0), ntConfidence: new Uint8Array(n), columns: columns(codes, tables) })));
+  const conditions = [
+    (name: CategoryName) => tables[name][Math.floor(tables[name].length * random() ** 2)],
+    (name: CategoryName) => tables[name].filter(() => random() < 0.3),
+    (name: CategoryName) => new RegExp(`^${name}${Math.floor(random() * 10)}`),
+    () => {
+      const parity = random() < 0.5 ? 0 : 1;
+      return (value: string) => value.length % 2 === parity;
+    },
+  ];
+  for (let q = 0; q < 300; q++) {
+    const query: NeuronQuery = {};
+    for (const name of CATEGORY_NAMES) if (random() < 0.3) query[name] = conditions[Math.floor(random() * conditions.length)](name);
+    const meets = (i: number) =>
+      CATEGORY_NAMES.every((name) => {
+        const condition = query[name];
+        const value = c.columns[name].value(i);
+        if (condition === undefined) return true;
+        if (typeof condition === "string") return value === condition;
+        if (condition instanceof RegExp) return condition.test(value);
+        if (typeof condition === "function") return condition(value);
+        return condition.includes(value);
+      });
+    assert.deepEqual([...c.find(query)], [...c.filter(meets)], JSON.stringify(query, (_, v) => (v instanceof RegExp ? String(v) : v)));
+  }
 });
 
 test("an empty connectome round-trips", () => {

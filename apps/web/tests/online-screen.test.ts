@@ -65,6 +65,9 @@ function world(canShare = true) {
   const did: string[] = [];
   const state = { lobbyStatus: "connecting" as Lobby["status"], rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
   const shell: Shell = {
+    journal: null,
+    canSavePictures: false,
+    savePicture: async () => "failed",
     settings: { ...DEFAULT_SETTINGS },
     maxFlies: 4,
     brain: { status: "running" } as unknown as Shell["brain"],

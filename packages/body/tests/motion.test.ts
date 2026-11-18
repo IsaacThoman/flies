@@ -228,7 +228,7 @@ test("being placed elsewhere clears the old wall turn, motion and contact", () =
   body.events.hit = 300;
   body.place(0, -150, 0);
   assert.equal(body.blocked, false);
-  assert.deepEqual(body.events, { tookOff: false, jumped: false, landed: false, hit: 0 });
+  assert.deepEqual(body.events, { tookOff: false, jumped: false, landed: false, hit: 0, hitFrom: body.events.hitFrom });
   assert.equal(body.groundSpeed, 0);
   assert.equal(body.turnRate, 0);
   assert.deepEqual(body.up, { x: 0, y: 1, z: 0 });

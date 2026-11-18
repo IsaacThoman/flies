@@ -114,6 +114,9 @@ int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& 
     in.bitter = senses->bitter;
     in.water = senses->water;
     in.thirst = senses->thirst;
+    in.temperature_left = senses->temperature_left;
+    in.temperature_right = senses->temperature_right;
+    for (int k = 0; k < FLY_TOUCH_PARTS; k++) in.touch_parts[k] = senses->touch_parts[k];
     for (size_t k = 0; k < 5; k++) {
       in.odor_left[k] = senses->odor_left[k];
       in.odor_right[k] = senses->odor_right[k];

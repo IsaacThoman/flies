@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { EAT_RATE, LAB, RESTAURANT_START, TABLE_TOPS, World, WORLDS } from "@fly/world";
+import { EAT_RATE, FOODS, LAB, RESTAURANT_START, TABLE_TOPS, World, WORLDS } from "@fly/world";
 import {
   AIRBORNE, AWAY, CLOSE, COLOURS, DROP_ID, EVERYONE, EVERYONE_ROOMS, EVERYONE_SERIES, FLY_MAX, LIMITS, MAX_FLIES, MAX_OWN, MAX_WALK, OWN_MAX, PLAYING, PROTOCOL, ROOM_SCALE, TABLETOP_SCALE, createFlyState, decodeFlies,
   encodeBites, encodeFly, encodeOwn, everyoneCode, everyoneIndex, everyoneName, everyoneSeries, seriesCode, spawnSpot, toWire,
@@ -1600,7 +1600,7 @@ test("refused bites are acknowledged and exact nutrition is delivered once", () 
   const accepted = saidOf(a, "food").at(-1)!;
   assert.equal(accepted.ack, 2);
   assert.ok(Math.abs(accepted.meal![0] - 0.1) < 1e-6);
-  assert.ok(Math.abs(accepted.meal![1] - 0.08) < 1e-6);
+  assert.ok(Math.abs(accepted.meal![1] - 0.1 * FOODS.berry.sweet) < 1e-6);
   bite(a, 99999999, 0.1);
   step(100);
   const missing = saidOf(a, "food").at(-1)!;
@@ -1626,7 +1626,7 @@ test("many unknown-food refusals cannot overflow acknowledgements or lose anothe
   const message = saidOf(b, "food").at(-1)!;
   assert.ok(message);
   assert.equal(message.gone.length, 0);
-  assert.ok(Math.abs(message.meal![1] - 0.08) < 1e-6);
+  assert.ok(Math.abs(message.meal![1] - 0.1 * FOODS.berry.sweet) < 1e-6);
 });
 
 test("a multi-fly device's bites are acknowledged and its meal delivered once, whichever of its flies reached the food", () => {
@@ -1660,7 +1660,7 @@ test("expiry replacement flushes pending bite receipts exactly once", () => {
   const receipt = saidOf(a, "food").at(-1)!;
   assert.equal(receipt.ack, 1);
   assert.ok(receipt.gone.includes(found.id));
-  assert.ok(Math.abs(receipt.meal![1] - 0.08) < 1e-6);
+  assert.ok(Math.abs(receipt.meal![1] - 0.1 * FOODS.berry.sweet) < 1e-6);
   clear(a);
   step(100);
   assert.ok(saidOf(a, "food").every((m) => m.meal![1] === 0));

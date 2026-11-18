@@ -6,11 +6,13 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { Food, Pantry, Vec3, World } from "@fly/world";
-import { tasteIntensity } from "@fly/world";
+import { AMBIENT_TEMPERATURE, tasteIntensity } from "@fly/world";
 import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
 import type { Bodies } from "./crowd.ts";
+import { POINT_REACH, TOUCH_PARTS, press, pressContacts, pressFlat } from "./touch.ts";
+import type { Contacts } from "./touch.ts";
 
 /**
  * Something the fly could see coming: a ball of radius `r` at `position`. Its
@@ -25,8 +27,10 @@ export type SenseInput = {
   pantry: Pantry;
   /** Things that could loom. Ignored while the eyes are in use: then the eyes see them. */
   looming: readonly Looming[];
-  /** Something touching it from outside (a feather), 0 to 1. */
-  stroke: number;
+  /** What touches it from outside this frame (a feather, a raindrop, a bubble), where and how hard. */
+  contacts?: Contacts;
+  /** Another fly pushing against it this frame: how hard (0 to 1) and where on its body (crowd.ts). */
+  pushed?: { readonly touch: number; readonly contact: Readonly<Vec3> };
   /** The air's own velocity at the fly, mm/s. */
   air: Vec3;
   /** The brain's eyes see the world: no hand-wired looming then. */
@@ -109,18 +113,41 @@ type EyeState = { value: number; hold: number };
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
-  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0, bitter: 0, water: 0 };
+  readonly senses: BrainSenses = {
+    loomLeft: 0,
+    loomRight: 0,
+    touch: 0,
+    bumpLeft: 0,
+    bumpRight: 0,
+    wind: 0,
+    sweet: 0,
+    grounded: true,
+    maleTaste: 0,
+    wingbeat: 0,
+    bitter: 0,
+    water: 0,
+    temperatureLeft: AMBIENT_TEMPERATURE,
+    temperatureRight: AMBIENT_TEMPERATURE,
+  };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
   #sizes = new Map<number, number>();
   #eyes: { left: EyeState; right: EyeState } = { left: { value: 0, hold: 0 }, right: { value: 0, hold: 0 } };
-  #touch = 0;
+  /** Each part's touch as felt (TOUCH_PARTS), easing out, and this frame's. */
+  readonly #touch = new Float64Array(TOUCH_PARTS.length);
+  readonly #pressed = new Float64Array(TOUCH_PARTS.length);
+  #touched = 0;
   #bumpLeft = 0;
   #bumpRight = 0;
   #wind = 0;
   #maleTaste = 0;
   #head: Vec3 = { x: 0, y: 0, z: 0 };
   #probe: Vec3 = { x: 0, y: 0, z: 0 };
+
+  /** How hard the hardest thing touching it presses, wherever it is (0 to 1; the feather resting 0.4, stroking 1), easing out as each part's touch does. */
+  get touched(): number {
+    return this.#touched;
+  }
 
   update(input: SenseInput): BrainSenses {
     const dt = Number.isFinite(input.dt) ? Math.max(0, input.dt) : 0;
@@ -161,9 +188,18 @@ export class SenseTracker {
     this.#eye(this.#eyes.left, loomLeft, dt);
     this.#eye(this.#eyes.right, loomRight, dt);
 
-    // Touch: stroked from outside, or hitting something in flight.
+    // Touch, where it lands: whatever touches it, another fly pushing it, and what it hits flying or landing.
+    const pressed = this.#pressed;
+    pressed.fill(0);
+    const contacts = input.contacts;
+    if (contacts) pressContacts(body, contacts, pressed);
+    const pushed = input.pushed;
+    if (pushed && pushed.touch > 0) press(body, pushed.contact.x, pushed.contact.y, pushed.contact.z, POINT_REACH, clamp01(pushed.touch), pressed);
     const hit = clamp01(body.events.hit / HIT_FULL_SPEED);
-    this.#touch = release(this.#touch, Math.max(clamp01(input.stroke), hit), RELEASE, dt);
+    if (hit > 0) pressFlat(body, body.events.hitFrom.x, body.events.hitFrom.y, body.events.hitFrom.z, POINT_REACH, hit, pressed);
+    for (let k = 0; k < pressed.length; k++) this.#touch[k] = release(this.#touch[k], pressed[k], RELEASE, dt);
+    const strongest = Math.max(contacts?.strongest ?? 0, pushed ? clamp01(pushed.touch) : 0, hit);
+    this.#touched = release(this.#touched, strongest, RELEASE, dt);
 
     // Antennae: just ahead of the head, one each side. Each feels what pushes it back.
     this.#bumpLeft = release(this.#bumpLeft, this.#pressing(body, world, 1, input.bodies) ? 1 : 0, RELEASE, dt);
@@ -190,7 +226,10 @@ export class SenseTracker {
     if (body.onFeet) {
       const mouth = body.point(MOUTH_AHEAD, MOUTH_UP, 0, this.#probe);
       const reach = MOUTH_REACH + PROBOSCIS_REACH * clamp01(input.proboscis);
-      const atMouth = pantry.touching(mouth.x, body.position.y, mouth.z, reach);
+      // The head goes down to the ground under it: on a rise it could step onto (up a fruit's curve) that is
+      // where its mouth is, not level with its feet, where the surface found would be the table under the fruit.
+      const feet = body.position.y;
+      const atMouth = pantry.touching(mouth.x, Math.max(feet, world.heightAt(mouth.x, mouth.z, feet + STEP_UP)), mouth.z, reach);
       const underfoot = pantry.touching(body.position.x, body.position.y, body.position.z, FOOT_SPREAD);
       // Stronger foot taste must not prevent eating a food already at the mouth.
       tasting.food = atMouth ?? underfoot;
@@ -202,7 +241,9 @@ export class SenseTracker {
 
     out.loomLeft = clamp01(this.#eyes.left.value);
     out.loomRight = clamp01(this.#eyes.right.value);
-    out.touch = clamp01(this.#touch);
+    // It knows where it is touched, so nothing touches it everywhere at once.
+    out.touch = 0;
+    for (let k = 0; k < TOUCH_PARTS.length; k++) out[TOUCH_PARTS[k]] = clamp01(this.#touch[k]);
     out.bumpLeft = clamp01(this.#bumpLeft);
     out.bumpRight = clamp01(this.#bumpRight);
     out.wind = clamp01(this.#wind);
@@ -213,7 +254,16 @@ export class SenseTracker {
     out.wingbeat = clamp01(body.wingbeat);
     out.bitter = clamp01(bitter);
     out.water = clamp01(water);
+    // The air's temperature at each arista, as it is: the brain's thermoreceptors make of it what they do.
+    out.temperatureLeft = this.#temperature(body, world, 1);
+    out.temperatureRight = this.#temperature(body, world, -1);
     return out;
+  }
+
+  /** The air's temperature at that antenna's tip, where its arista's thermoreceptors are, at the arista's base (Gallio et al. 2011). */
+  #temperature(body: FlyBody, world: World, side: 1 | -1) {
+    const arista = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
+    return world.temperature.at(arista.x, arista.y, arista.z);
   }
 
   #foreleg(body: FlyBody, side: 1 | -1, bodies: Bodies | undefined) {

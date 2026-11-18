@@ -10,6 +10,8 @@
 // floor, a chair seat, the table top over it. Questions about a point say
 // which by a height: the surface at or below it, the underside above it.
 
+import { Temperature } from "./climate.ts";
+import type { Climate } from "./climate.ts";
 import type { FoodPatch } from "./pantry.ts";
 import { dishScales, domeScale, inside, prismSpan, sideNormal, solidBottom, topHeight, topNormal, topPeak } from "./shapes.ts";
 import type { Solid, Vec3 } from "./shapes.ts";
@@ -28,6 +30,8 @@ export type Place = {
   start: { x: number; z: number; yaw: number; y?: number };
   /** In the air it is drawn back below this height, mm. */
   ceiling: number;
+  /** How warm its air is, and where it is warmer or cooler; left out, AMBIENT_TEMPERATURE all over. */
+  climate?: Climate;
 };
 
 /** A surface over a point: its height, which way it faces, and how much air there is over it. */
@@ -89,7 +93,13 @@ const B = 6;
 export class World {
   place!: Place;
   solids: readonly Solid[] = [];
+  /** The air's temperature, the place's own until something changes it. */
+  readonly temperature = new Temperature();
   floor!: Floor;
+  /** Where the moving solids start in `solids` (addMoving): the place's own come first. */
+  movingFrom = 0;
+  /** Changes whenever the world does (a place loaded, something moved): an answer kept about it holds while this does. */
+  version = 0;
   #span: [number, number] = [0, 0];
   #bounds = new Float64Array(0);
   #cell = MIN_CELL;
@@ -101,6 +111,11 @@ export class World {
   #starts = new Int32Array(1);
   #items = new Int32Array(0);
   #big = new Int32Array(0);
+  /** How many of `#big` every query checks: the big solids standing still (`#still` of them), then the moving ones while they are present. */
+  #bigCount = 0;
+  #still = 0;
+  #moving: Solid[] = [];
+  #present = true;
   /** Each candidate's top in a point query, for a second look at them. */
   #heights = new Float64Array(0);
   #visited = new Uint32Array(0);
@@ -123,40 +138,26 @@ export class World {
 
   load(place: Place) {
     this.place = place;
-    this.solids = place.solids;
+    this.temperature.set(place.climate);
+    const moving = this.#moving;
+    this.solids = moving.length > 0 ? [...place.solids, ...moving] : place.solids;
+    this.movingFrom = place.solids.length;
     this.floor = place.floor;
-    const n = place.solids.length;
-    const bounds = (this.#bounds = new Float64Array(n * B));
+    const n = this.solids.length;
+    this.#bounds = new Float64Array(n * B);
+    const bounds = this.#bounds;
     const f = place.floor;
     const fx = f.kind === "circle" ? f.r : f.hx;
     const fz = f.kind === "circle" ? f.r : f.hz;
-    // Everything's extent sizes the cells.
+    // Everything's extent sizes the cells: everything standing still, as what moves is checked by every query.
     let minX = -fx;
     let maxX = fx;
     let minZ = -fz;
     let maxZ = fz;
     for (let i = 0; i < n; i++) {
-      const solid = place.solids[i];
-      const p = solid.footprint;
-      let rx: number;
-      let rz: number;
-      if (p.kind === "circle") rx = rz = p.r;
-      else {
-        const c = Math.cos(p.angle);
-        const s = Math.sin(p.angle);
-        rx = p.kind === "box" ? Math.abs(c) * p.hx + Math.abs(s) * p.hz : Math.hypot(c * p.rx, s * p.rz);
-        rz = p.kind === "box" ? Math.abs(s) * p.hx + Math.abs(c) * p.hz : Math.hypot(s * p.rx, c * p.rz);
-      }
-      rx += 1e-8;
-      rz += 1e-8;
+      this.#bound(i);
+      if (i >= this.movingFrom) continue;
       const b = i * B;
-      bounds[b] = p.x - rx;
-      bounds[b + 1] = p.x + rx;
-      bounds[b + 2] = p.z - rz;
-      bounds[b + 3] = p.z + rz;
-      const top = solid.top;
-      bounds[b + 4] = (top.kind === "dish" ? Math.max(top.well, top.rim) : topPeak(top)) + 1e-8;
-      bounds[b + 5] = solidBottom(solid);
       minX = Math.min(minX, bounds[b]);
       maxX = Math.max(maxX, bounds[b + 1]);
       minZ = Math.min(minZ, bounds[b + 2]);
@@ -167,12 +168,12 @@ export class World {
     const inv = 1 / cell;
     const span = (lo: number, hi: number) => Math.floor(hi * inv) - Math.floor(lo * inv) + 1;
     const big: number[] = [];
-    // The grid covers the floor and everything but the big solids.
+    // The grid covers the floor and everything but the big solids and what moves.
     minX = -fx;
     maxX = fx;
     minZ = -fz;
     maxZ = fz;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < this.movingFrom; i++) {
       const b = i * B;
       if (span(bounds[b], bounds[b + 1]) * span(bounds[b + 2], bounds[b + 3]) > BIG_CELLS) {
         big.push(i);
@@ -189,7 +190,10 @@ export class World {
     this.#z0 = Math.floor(minZ * inv) * cell;
     const nx = (this.#nx = Math.floor(maxX * inv) - Math.floor(minX * inv) + 1);
     const nz = (this.#nz = Math.floor(maxZ * inv) - Math.floor(minZ * inv) + 1);
+    this.#still = big.length;
+    for (let i = this.movingFrom; i < n; i++) big.push(i);
     this.#big = Int32Array.from(big);
+    this.#bigCount = this.#still + (this.#present ? moving.length : 0);
     // Counted, then filed: each cell's solids in description order.
     const starts = (this.#starts = new Int32Array(nx * nz + 1));
     const isBig = new Uint8Array(n);
@@ -221,6 +225,62 @@ export class World {
     this.#epoch = 0;
     this.#near = new Int32Array(n);
     this.#nearCount = 0;
+    this.version++;
+  }
+
+  /**
+   * Adds solids that move (a fingertip), from now on and in every place
+   * loaded after: after the place's own (from `movingFrom`), and checked by
+   * every query rather than filed in the grid. Whoever moves them changes
+   * their footprints and tops in place and says so (`moved`).
+   */
+  addMoving(solids: readonly Solid[]) {
+    this.#moving.push(...solids);
+    this.load(this.place);
+  }
+
+  /** The moving solids have moved: their bounds follow them, and anything that kept an answer about the world asks again (`version`). */
+  moved() {
+    for (let i = this.movingFrom; i < this.solids.length; i++) this.#bound(i);
+    this.version++;
+  }
+
+  /** Whether the moving solids are in the world now; out of it, no query meets them (the finger put away, or a ray from the camera that shouldn't land on it). */
+  get movingPresent() {
+    return this.#present;
+  }
+
+  set movingPresent(present: boolean) {
+    if (present === this.#present) return;
+    this.#present = present;
+    this.#bigCount = this.#still + (present ? this.#moving.length : 0);
+    this.version++;
+  }
+
+  /** Solid i's box seen from above, its peak and its bottom, into `#bounds`. */
+  #bound(i: number) {
+    const bounds = this.#bounds;
+    const solid = this.solids[i];
+    const p = solid.footprint;
+    let rx: number;
+    let rz: number;
+    if (p.kind === "circle") rx = rz = p.r;
+    else {
+      const c = Math.cos(p.angle);
+      const s = Math.sin(p.angle);
+      rx = p.kind === "box" ? Math.abs(c) * p.hx + Math.abs(s) * p.hz : Math.hypot(c * p.rx, s * p.rz);
+      rz = p.kind === "box" ? Math.abs(s) * p.hx + Math.abs(c) * p.hz : Math.hypot(s * p.rx, c * p.rz);
+    }
+    rx += 1e-8;
+    rz += 1e-8;
+    const b = i * B;
+    bounds[b] = p.x - rx;
+    bounds[b + 1] = p.x + rx;
+    bounds[b + 2] = p.z - rz;
+    bounds[b + 3] = p.z + rz;
+    const top = solid.top;
+    bounds[b + 4] = (top.kind === "dish" ? Math.max(top.well, top.rim) : topPeak(top)) + 1e-8;
+    bounds[b + 5] = solidBottom(solid);
   }
 
   /** Over the floor (inside its edge). */
@@ -297,7 +357,7 @@ export class World {
     const c = this.#cellAt(x, z);
     const from = c < 0 ? 0 : this.#starts[c];
     const cells = c < 0 ? 0 : this.#starts[c + 1] - from;
-    const count = cells + this.#big.length;
+    const count = cells + this.#bigCount;
     let under = Infinity;
     for (let k = 0; k < count; k++) {
       const i = k < cells ? this.#items[from + k] : this.#big[k - cells];
@@ -316,7 +376,7 @@ export class World {
     const c = this.#cellAt(x, z);
     const from = c < 0 ? 0 : this.#starts[c];
     const cells = c < 0 ? 0 : this.#starts[c + 1] - from;
-    const count = cells + this.#big.length;
+    const count = cells + this.#bigCount;
     let best = -1;
     let height = y + TOUCH;
     for (let k = 0; k < count; k++) {
@@ -355,7 +415,7 @@ export class World {
     const nx = this.#nx;
     const big = this.#big;
     let count = 0;
-    for (let k = 0; k < big.length; k++) if (overlaps(bounds, big[k] * B, x, z, r, low, high)) near[count++] = big[k];
+    for (let k = 0; k < this.#bigCount; k++) if (overlaps(bounds, big[k] * B, x, z, r, low, high)) near[count++] = big[k];
     for (let row = z0; row <= z1; row++) {
       for (let column = x0; column <= x1; column++) {
         const c = row * nx + column;
@@ -412,7 +472,7 @@ export class World {
     const c = this.#cellAt(x, z);
     const from = c < 0 ? 0 : this.#starts[c];
     const cells = c < 0 ? 0 : this.#starts[c + 1] - from;
-    const count = cells + this.#big.length;
+    const count = cells + this.#bigCount;
     let best = -1;
     let height = low;
     for (let k = 0; k < count; k++) {
@@ -456,7 +516,7 @@ export class World {
       }
     }
     const big = this.#big;
-    for (let k = 0; k < big.length; k++) this.#meet(big[k], origin, dir, height, out);
+    for (let k = 0; k < this.#bigCount; k++) this.#meet(big[k], origin, dir, height, out);
 
     // The grid's cells along the ray, nearest first.
     const cell = this.#cell;
@@ -553,7 +613,7 @@ export class World {
     const c = this.#cellAt(x, z);
     const from = c < 0 ? 0 : this.#starts[c];
     const cells = c < 0 ? 0 : this.#starts[c + 1] - from;
-    const count = cells + this.#big.length;
+    const count = cells + this.#bigCount;
     let y = 0;
     let best = -1;
     for (let k = 0; k < count; k++) {

@@ -15,7 +15,9 @@ import { WASI } from "node:wasi";
 import type { EyeColumn } from "../../brain/src/eye-columns.ts";
 import { buildEyes } from "../../brain/src/eyes.ts";
 import { loadConnectome } from "../../brain/src/format.ts";
+import { ODORANTS } from "../../brain/src/olfaction.ts";
 import { FlyBrain, createBrain } from "../../brain/src/runtime.ts";
+import { TOUCH_SENSES } from "../../brain/src/io.ts";
 import { mulberry32 } from "../../brain/src/sim.ts";
 import type { Simulation } from "../../brain/src/sim.ts";
 import { BATTERY, facetAngles, render } from "../../brain/src/stimuli.ts";
@@ -94,6 +96,8 @@ const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind
 type Scalar = (typeof SCALAR)[number];
 /** The internal state, after the senses in the harness's line, in fly_senses's order. */
 const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
+/** The temperature at each antenna, last in the harness's line; left out, NaN. */
+const TEMPERATURE = ["temperatureLeft", "temperatureRight"] as const;
 
 /**
  * The scripted senses: rest standing and airborne, each sense alone, partial
@@ -115,6 +119,8 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     if (each.hunger !== undefined) each.hunger = Math.fround(each.hunger);
     if (each.thirst !== undefined) each.thirst = Math.fround(each.thirst);
     for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
+    for (const key of TEMPERATURE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
+    for (const key of TOUCH_SENSES) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     if (each.odor) each.odor = { left: Float32Array.from(each.odor.left), right: Float32Array.from(each.odor.right) };
     ticks.push({ dt, senses: each, what });
     if (dt >= 0 && dt <= 1000) total += dt;
@@ -153,6 +159,15 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(1500, 16, () => ({ sweet: 1, bitter: 0.5 }), "sugar laced with something bitter");
     hold(2000, 16, (t) => ({ sweet: 1, water: 1, thirst: 1 - t / 2000 }), "sugary water as thirst is quenched");
     hold(500, 16, (t) => ({ water: 1, thirst: [Number.NaN, -1, 7, Number.NEGATIVE_INFINITY][Math.floor(t / 125)] }), "out-of-range thirst");
+    for (const part of TOUCH_SENSES) {
+      hold(600, cycle % 2 === 0 ? 16 : 33, () => ({ [part]: 1 }), `${part} at full strength`);
+      hold(300, 16, () => ({}), `rest after ${part}`);
+    }
+    hold(2000, 16, () => ({ touchNotum: 0.29, touchWings: 0.16 }), "the feather resting on its back");
+    hold(1500, 16, (t) => ({ touchFrontLeft: 1, touchEyeLeft: t / 1500, touch: 0.3 }), "stroked at the face, touched all over a little");
+    hold(1000, 16, () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1, touchFrontRight: 1, touchOcciputRight: 0.4 }), "asleep, its face stroked");
+    hold(500, 16, (t) => ({ touchLegs: [Number.NaN, -1, 7, Number.POSITIVE_INFINITY][Math.floor(t / 125)], touchAbdomen: 0.5 }), "out-of-range touch parts");
+    hold(1000, 16, () => Object.fromEntries(TOUCH_SENSES.map((s) => [s, random() < 0.3 ? random() : 0])), "random touch parts");
     hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 }), "everything at once");
     hold(4000, 16, (t) => ({ loomRight: t % 1000 < 100 ? 1 : 0 }), "a looming pulse every second");
     hold(3000, () => Math.floor(random() * 50 * 4) / 4, () => Object.fromEntries(SCALAR.map((s) => [s, random() < 0.3 ? random() : 0])), "random ticks and senses");
@@ -167,6 +182,13 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(1000, 16, () => ({ clockSleep: 1, sleepDepth: 0.5, loomRight: 1 }), "half asleep, a loom");
     hold(500, 16, () => ({ clockMorning: 7, clockEvening: -1, clockSleep: Number.NaN, sleepPressure: Number.POSITIVE_INFINITY, sleepDepth: -0.5 }), "out-of-range state");
     hold(1000, 16, () => Object.fromEntries(STATE.map((s) => [s, random() < 0.5 ? random() : 0])), "random state");
+    hold(2000, 16, () => ({ temperatureLeft: 25, temperatureRight: 25 }), "at 25 °C");
+    hold(3000, 16, (t) => ({ temperatureLeft: 25 + t / 1000, temperatureRight: 25 + t / 1500 }), "warming, the left faster");
+    hold(2000, 33, (t) => ({ temperatureLeft: 28 - t / 400, temperatureRight: 27 }), "cooling on the left");
+    hold(1500, 16, () => ({ temperatureLeft: 16, temperatureRight: 16, touch: 0.5 }), "a step to 16 °C, touched");
+    for (let k = 0; k < 6; k++) add([100, 1000, 7.3][k % 3], { temperatureLeft: 20 + 3 * k, temperatureRight: 35 - 2 * k }, "long ticks at changing temperatures");
+    hold(1000, 16, (t) => ({ temperatureLeft: [Number.NaN, -40, 1e6, Number.POSITIVE_INFINITY][Math.floor(t / 250)], temperatureRight: 25 + Math.sin(t / 50) }), "out-of-range temperatures");
+    hold(1000, () => Math.floor(random() * 50 * 4) / 4, () => ({ temperatureLeft: random() * 40, temperatureRight: random() < 0.2 ? Number.NaN : random() * 40 }), "random temperatures");
     for (const dt of [-1, Number.NaN, 1000.5, Number.POSITIVE_INFINITY]) add(dt, {}, "an invalid tick");
     hold(5000, 16, () => ({}), "rest at the end of a cycle");
     if (eyes) sight(eyes, cycle, random, add, hold);
@@ -294,7 +316,19 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
   };
   const lines = ticks.map(({ dt, senses }) => {
     const light = senses.light ? `${ref(senses.light.left)},${ref(senses.light.right)}` : "-";
-    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, ...STATE.map((s) => hex32(senses[s] ?? 0)), light, hex32(senses.hunger ?? 1), hex32(senses.thirst ?? 1), ...Array.from({ length: 5 }, (_, k) => hex32(senses.odor?.left?.[k] ?? 0)), ...Array.from({ length: 5 }, (_, k) => hex32(senses.odor?.right?.[k] ?? 0))].join(" ");
+    return [
+      hex64(dt),
+      ...SCALAR.map((s: Scalar) => hex32(senses[s])),
+      senses.grounded ? 1 : 0,
+      ...STATE.map((s) => hex32(senses[s] ?? 0)),
+      light,
+      hex32(senses.hunger ?? 1),
+      hex32(senses.thirst ?? 1),
+      ...TEMPERATURE.map((s) => hex32(senses[s] ?? Number.NaN)),
+      TOUCH_SENSES.map((s) => hex32(senses[s] ?? 0)).join(","),
+      ...Array.from({ length: ODORANTS.length }, (_, k) => hex32(senses.odor?.left?.[k] ?? 0)),
+      ...Array.from({ length: ODORANTS.length }, (_, k) => hex32(senses.odor?.right?.[k] ?? 0)),
+    ].join(" ");
   });
   const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
   let at = 0;
@@ -388,6 +422,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
           c.map(hex32).join(" "),
           rates.map(hex32).join(" "),
           [brain.state.arousal.value, brain.state.scene.left.value, brain.state.scene.right.value, brain.state.sleep].map(hex64).join(" "),
+          [brain.thermoreceptors.adapted.left, brain.thermoreceptors.adapted.right].map((t) => (Number.isNaN(t) ? "nan" : hex64(t))).join(" "),
           retinaDigest(brain),
           modulationDigest(brain),
           tick++ % 50 === 49 ? digest(brain.sim) : "-",

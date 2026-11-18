@@ -4,7 +4,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
-import { Behavior, Crowd, FlyBody, Hunger, SenseTracker, Thirst } from "@fly/body";
+import { Behavior, Contacts, Crowd, FlyBody, Hunger, SenseTracker, TOUCH_PARTS, Thirst } from "@fly/body";
 import type { Forces, Intent, Looming, Rhythm } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
@@ -14,8 +14,8 @@ export type Activity = "resting" | "sleeping" | "walking" | "backing" | "turning
 
 export type Stimuli = {
   looming: Looming[];
-  /** A feather on it: 0 to 1. */
-  stroke: number;
+  /** What touches it from outside this frame (a feather, a raindrop, a bubble): where it lands and how hard. */
+  contacts: Contacts;
   /** The air's velocity at the fly. */
   air: Vec3;
   /** Where the thing that loomed is, for the direction of a take-off. */
@@ -37,13 +37,20 @@ export class Life {
   brain: BrainDriver;
   /** Other flies (at a table with others, and the others this device lives): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
-  readonly stimuli: Stimuli = { looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, threat: null };
+  readonly stimuli: Stimuli = { looming: [], contacts: new Contacts(), air: { x: 0, y: 0, z: 0 }, threat: null };
   /**
    * Its daily clock and need for sleep, told to the brain with the senses, or
    * null for a fly with neither (the brain as it was before them; tests, unless
    * they give it one). The game gives it one set to the real time of day.
    */
   rhythm: Rhythm | null = null;
+  /**
+   * Whether the brain is told the air's temperature at its antennae. Off in the
+   * game: so far its thermoreceptors don't keep it off a warm floor, as a fly's
+   * do, and a steady 25 °C makes it walk a quarter less
+   * (packages/brain/README.md, Temperature). scripts/thermotaxis.ts turns it on.
+   */
+  feelsTemperature = false;
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
   /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
@@ -133,8 +140,9 @@ export class Life {
       world: this.world,
       pantry: this.pantry,
       looming: stimuli.looming,
-      // Another fly pushing against it is felt as anything touching it is.
-      stroke: Math.max(stimuli.stroke, this.crowd.touch),
+      contacts: stimuli.contacts,
+      // Another fly pushing against it is felt where it pushes, as anything touching it is.
+      pushed: this.crowd,
       air: stimuli.air,
       eyesOpen,
       proboscis: this.#proboscis,
@@ -144,6 +152,7 @@ export class Life {
     sent.loomLeft = felt.loomLeft;
     sent.loomRight = felt.loomRight;
     sent.touch = felt.touch;
+    for (let k = 0; k < TOUCH_PARTS.length; k++) sent[TOUCH_PARTS[k]] = felt[TOUCH_PARTS[k]];
     sent.bumpLeft = felt.bumpLeft;
     sent.bumpRight = felt.bumpRight;
     sent.wind = felt.wind;
@@ -155,6 +164,13 @@ export class Life {
     sent.wingbeat = felt.wingbeat;
     sent.bitter = felt.bitter;
     sent.water = felt.water;
+    if (this.feelsTemperature) {
+      sent.temperatureLeft = felt.temperatureLeft;
+      sent.temperatureRight = felt.temperatureRight;
+    } else {
+      delete sent.temperatureLeft;
+      delete sent.temperatureRight;
+    }
     if (this.light) sent.light = this.light;
     else delete sent.light;
     const rhythm = this.rhythm;

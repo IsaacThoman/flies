@@ -7,8 +7,8 @@
 // the rain the drops burst them, and few new ones come.
 
 import * as THREE from "three";
-import { FLY_LENGTH } from "@fly/body";
-import type { Looming } from "@fly/body";
+import { FLY_LENGTH, POINT_REACH } from "@fly/body";
+import type { Contacts, Looming } from "@fly/body";
 import { MAX_OWN, POP_SECONDS } from "@fly/net";
 import type { TableBubbles } from "@fly/net";
 import { BREEZE, createSurface } from "@fly/world";
@@ -78,6 +78,8 @@ export class Bubbles {
   brushed = 0;
   /** The same for each of the other flies this device lives, by their place in line, this frame. */
   readonly brushedBy = new Float32Array(MAX_OWN);
+  /** Where the bubble that burst on each fly this frame was (x, y, z; the followed fly first, then the others in line): its film meets the fly on the side facing it. */
+  readonly #brushedAt = new Float64Array(3 * (MAX_OWN + 1));
   /** Their middles, as the game last gave them: a bubble that reaches one bursts on it. */
   #others: readonly THREE.Vector3Like[] = [];
   /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see or feel of them. */
@@ -169,7 +171,7 @@ export class Bubbles {
       b.popping = 0;
       const on = this.#on(b, fly);
       if (on < 0 || !table.bubbles.pop(slot, s.cycle, t)) return;
-      this.#brush(on);
+      this.#brush(on, b);
       table.burst(slot, s.cycle, t);
     }
     if (s.poppedAt >= 0 && t - s.poppedAt < POP_SECONDS) {
@@ -206,9 +208,19 @@ export class Bubbles {
     return -1;
   }
 
-  #brush(on: number) {
+  #brush(on: number, b: Bubble) {
     if (on === 0) this.brushed = BUBBLE_TOUCH;
     else this.brushedBy[on - 1] = BUBBLE_TOUCH;
+    this.#brushedAt[3 * on] = b.x;
+    this.#brushedAt[3 * on + 1] = b.y;
+    this.#brushedAt[3 * on + 2] = b.z;
+  }
+
+  /** A bubble that burst on a fly this frame (0 the followed one, then the others in line), as a touch where it met it, added to `contacts`. */
+  touch(on: number, contacts: Contacts) {
+    const strength = on === 0 ? this.brushed : this.brushedBy[on - 1];
+    const at = this.#brushedAt;
+    contacts.add(at[3 * on], at[3 * on + 1], at[3 * on + 2], POINT_REACH, strength);
   }
 
   /**
@@ -252,7 +264,7 @@ export class Bubbles {
         const on = this.#on(b, fly);
         if (on >= 0) {
           burst = true;
-          this.#brush(on);
+          this.#brush(on, b);
         }
       }
       if (burst) {

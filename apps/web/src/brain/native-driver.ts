@@ -64,7 +64,16 @@ export class NativeBrainDriver implements BrainDriver {
       const s = this.#scalars;
       for (let i = 0; i < SENSE_ORDER.length; i++) {
         const name = SENSE_ORDER[i];
-        s[i] = name === "grounded" ? (senses.grounded ? 1 : 0) : name === "hunger" || name === "thirst" ? (senses[name] ?? 1) : (senses[name] ?? 0);
+        s[i] =
+          name === "grounded"
+            ? senses.grounded
+              ? 1
+              : 0
+            : name === "hunger" || name === "thirst"
+              ? (senses[name] ?? 1)
+              : name === "temperatureLeft" || name === "temperatureRight"
+                ? (senses[name] ?? Number.NaN)
+                : (senses[name] ?? 0);
       }
       for (let k = 0; k < ODORANTS.length; k++) {
         s[SENSE_ORDER.length + k] = senses.odor?.left?.[k] ?? 0;

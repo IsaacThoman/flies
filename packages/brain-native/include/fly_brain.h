@@ -15,6 +15,9 @@ extern "C" {
 
 typedef struct fly_brain fly_brain;
 
+/** How many parts of the body touch can land on (fly_senses.touch_parts). */
+#define FLY_TOUCH_PARTS 12
+
 /** What the body feels. Intensities run 0 to 1; see BrainSenses in packages/brain/src/types.ts. */
 typedef struct fly_senses {
   float loom_left, loom_right, touch, bump_left, bump_right, wind, sweet;
@@ -47,6 +50,21 @@ typedef struct fly_senses {
    * initialised without it leaves: that is a fly that has just drunk.
    */
   float thirst;
+  /**
+   * The air's temperature at the left and right antenna's arista, °C
+   * (BrainSenses.temperatureLeft and Right). NAN for a host that has no
+   * temperature: those thermoreceptors get no input, the brain as it was
+   * before them. Not 0: that is freezing.
+   */
+  float temperature_left, temperature_right;
+  /**
+   * Touch where it lands, 0 to 1 each, in this order: the left and right
+   * eye's, front's, occiput's and mouthparts' bristles, then the notum's, the
+   * wings', the abdomen's and the legs' (types.ts's BrainSenses says what
+   * each part is). 0, as a struct initialised without them leaves them. A
+   * part feels the stronger of its own and `touch`, which is all of them.
+   */
+  float touch_parts[FLY_TOUCH_PARTS];
   /** Odor strengths 0..1 in ODORANTS order: ethyl acetate, acetic acid, ethanol, isoamyl acetate, CO2. Zero-initialised = no odour. */
   float odor_left[5], odor_right[5];
 } fly_senses;

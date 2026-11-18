@@ -323,7 +323,7 @@ test("the native driver waits for the host, then packs senses in order and decod
   assert.equal(driver.status, "loading");
   assert.equal(fake.submitted.length, 0);
   fake.setStatus("running");
-  const senses: BrainSenses = { ...RESTING_SENSES, sweet: 0.75, bumpLeft: 0.5, grounded: false };
+  const senses: BrainSenses = { ...RESTING_SENSES, sweet: 0.75, bumpLeft: 0.5, grounded: false, temperatureLeft: 31 };
   driver.tick(16, senses);
   assert.equal(driver.status, "running");
   assert.equal(driver.neurons, 166700);
@@ -332,6 +332,8 @@ test("the native driver waits for the host, then packs senses in order and decod
   assert.equal(sent.scalars[SENSE_ORDER.indexOf("sweet")], 0.75);
   assert.equal(sent.scalars[SENSE_ORDER.indexOf("bumpLeft")], 0.5);
   assert.equal(sent.scalars[SENSE_ORDER.indexOf("grounded")], 0);
+  assert.equal(sent.scalars[SENSE_ORDER.indexOf("temperatureLeft")], 31);
+  assert.ok(Number.isNaN(sent.scalars[SENSE_ORDER.indexOf("temperatureRight")]), "a temperature left out is none felt");
   const latest = (): BrainState | null => driver.state;
   assert.equal(latest(), null, "no state yet");
   fake.produce(0.6);

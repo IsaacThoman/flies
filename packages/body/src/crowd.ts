@@ -40,8 +40,9 @@ export class Crowd implements Bodies {
   readonly neighbours: Neighbour[] = Array.from({ length: MAX_NEIGHBOURS }, () => ({ x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0 }));
   /** How many of `neighbours` are there now. */
   count = 0;
-  /** Another fly touching it this frame (0 to 1), for its senses. */
+  /** Another fly touching it this frame (0 to 1), for its senses, and where on its body (mm, in the world): the side of it the other is on. */
   touch = 0;
+  readonly contact = { x: 0, y: 0, z: 0 };
   /** How deep it was into another fly before it was pushed out, mm, this frame (for measuring). */
   overlap = 0;
   readonly #world: World;
@@ -143,6 +144,11 @@ export class Crowd implements Bodies {
       nx /= l;
       nz /= l;
       this.overlap = Math.max(this.overlap, depth);
+      if (depth >= this.overlap) {
+        this.contact.x = scratch.ax - nx * BODY_RADIUS;
+        this.contact.y = p.y + BODY_UP;
+        this.contact.z = scratch.az - nz * BODY_RADIUS;
+      }
       if (body.mode === "airborne") {
         // Bounced off it, as off anything it flies into; the hit is felt.
         const v = body.velocity;
@@ -150,7 +156,7 @@ export class Crowd implements Bodies {
         if (into < 0) {
           v.x -= into * nx * BOUNCE;
           v.z -= into * nz * BOUNCE;
-          body.events.hit = Math.max(body.events.hit, -into);
+          body.hitAgainst(-into, nx, 0, nz);
         }
         p.x += nx * depth;
         p.z += nz * depth;

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FLY_HEIGHT } from "@fly/body";
 import { GREENHOUSE_BENCH, GLAZING, GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS, SAUCER, TRAY, topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { EYE_LAYER } from "../../eyes/eyes.ts";
@@ -10,6 +11,9 @@ import { waterMaterial } from "../windowsill/glass.ts";
 import { foliage } from "./foliage.ts";
 import { sunShafts } from "./shafts.ts";
 import { glazing } from "./glass.ts";
+
+/** A drop from the roof's leak, its radius, mm: water hanging from a surface falls once it is about 4 mm across. */
+const LEAK_DROP = 2;
 
 const box = (x: number, y: number, z: number, w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
 
@@ -255,7 +259,7 @@ outgoingLight += wave * 0.14;
         drip.visible = y > SAUCER.water; drip.position.set(SAUCER.x + 7, Math.max(SAUCER.water, y), SAUCER.z - 4);
         if (y <= SAUCER.water) {
           ripple(SAUCER.x + 7, SAUCER.z - 4, 0.65);
-          if (Math.hypot(around.fly.x - drip.position.x, around.fly.z - drip.position.z) < 2.5 && Math.abs(around.fly.y - SAUCER.water) < 2) around.felt.touch = Math.max(around.felt.touch, 0.5);
+          if (Math.hypot(around.fly.x - drip.position.x, around.fly.z - drip.position.z) < 2.5 && Math.abs(around.fly.y - SAUCER.water) < 2) around.felt.contacts.add(drip.position.x, around.fly.y + FLY_HEIGHT, drip.position.z, LEAK_DROP, 0.5);
           age = -1;
         }
       }

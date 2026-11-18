@@ -4,13 +4,14 @@
 // draw, and nothing is drawn that isn't there.
 
 import * as THREE from "three";
+import { roundedRect } from "@fly/ui";
 import { BALL_RADIUS, FOODS, isDropped } from "@fly/world";
 import type { FoodKind, Pantry, Vec3 } from "@fly/world";
 import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
-import { TOOLS } from "./hands.ts";
+import { FEATHER_BRUSH, TOOLS } from "./hands.ts";
 import type { Hands, ToolId } from "./hands.ts";
 
-const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water"];
+const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water", "coffee", "laced"];
 const MAX_FOOD = 8;
 const BALL_COLORS = ["#b0183a", "#4a2060", "#e0284a", "#4a2060", "#b0183a", "#2c4a3a"];
 const PUFFS = 24;
@@ -80,6 +81,35 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: num
       g.quadraticCurveTo(r * 0.85, r * 0.05, r * 0.35, r * 0.4);
       g.quadraticCurveTo(-r * 0.15, r * 0.05, r * 0.35, -r * 0.65);
       g.fill();
+      g.stroke();
+      break;
+    }
+    case "finger": {
+      // A fingertip pointing down at the table from the top right, its nail toward us.
+      g.rotate(0.55);
+      g.fillStyle = "#f2b79c";
+      g.strokeStyle = "#b8604a";
+      g.lineWidth = r * 0.08;
+      g.beginPath();
+      g.moveTo(-r * 0.36, -r * 0.95);
+      g.lineTo(-r * 0.36, r * 0.42);
+      g.arc(0, r * 0.42, r * 0.36, Math.PI, 0, true);
+      g.lineTo(r * 0.36, -r * 0.95);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#fbe3dc";
+      g.beginPath();
+      g.moveTo(-r * 0.2, r * 0.05);
+      g.lineTo(-r * 0.2, r * 0.48);
+      g.arc(0, r * 0.48, r * 0.2, Math.PI, 0, true);
+      g.lineTo(r * 0.2, r * 0.05);
+      g.closePath();
+      g.fill();
+      g.lineWidth = r * 0.05;
+      g.stroke();
+      g.beginPath();
+      g.moveTo(-r * 0.22, -r * 0.35);
+      g.quadraticCurveTo(0, -r * 0.28, r * 0.22, -r * 0.35);
       g.stroke();
       break;
     }
@@ -263,6 +293,23 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: num
       g.fill();
       break;
     }
+    case "photo": {
+      // A still camera: its body, the shutter button, and a big glass lens.
+      g.fillStyle = "#3a4a6a";
+      roundedRect(g, -r * 0.8, -r * 0.42, r * 1.6, r * 1.02, r * 0.18);
+      g.fill();
+      g.fillRect(-r * 0.3, -r * 0.6, r * 0.6, r * 0.24);
+      g.fillStyle = "#ffb11c";
+      g.fillRect(r * 0.42, -r * 0.6, r * 0.24, r * 0.14);
+      g.fillStyle = "#9fe0ff";
+      g.strokeStyle = "#e8f6ff";
+      g.lineWidth = r * 0.1;
+      g.beginPath();
+      g.arc(0, r * 0.08, r * 0.34, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      break;
+    }
   }
   g.restore();
 }
@@ -356,6 +403,14 @@ function foodGeometry(kind: FoodKind) {
     }
     case "water":
       return paint(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.5, 1), "#e8f8ff");
+    case "coffee":
+      // A drop of black coffee: dark, with a little crema-brown where it is thin at its edge.
+      return paint(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.42, 1), (p) => (p.y > r * 0.12 ? "#2a1408" : "#6b3c1c"));
+    case "laced": {
+      // A sugar lump dipped in coffee: soaked brown from its foot, white above the line.
+      const s = r * 1.3;
+      return paint(new THREE.BoxGeometry(s, s, s, 1, 3, 1).translate(0, s / 2, 0), (p) => (p.y < s * 0.1 ? "#6e3a16" : p.y < s * 0.4 ? "#d2ab7e" : p.y > r ? "#ffffff" : "#f2f6fa"));
+    }
   }
 }
 
@@ -389,7 +444,7 @@ export class HandsView {
   #right = new THREE.Vector3();
   #iconSide = 1;
   #rnd = random(9);
-  #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0 };
+  #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0, coffee: 0, laced: 0 };
   /** 0 hides the pointer and tool (the wallpaper), 1 shows them. */
   opacity = 1;
   /** The tool's picture floats by the ring (not for another player's hand at a table, whose ring in their colour is enough). */
@@ -468,6 +523,11 @@ export class HandsView {
     this.group.removeFromParent();
   }
 
+  /** For this frame only, the pointer and the tool over it aren't drawn (a photo is being taken of it); the next update shows them again. */
+  hidePointer() {
+    this.#ring.visible = this.#ripple.visible = this.#icon.visible = false;
+  }
+
   /** Colours the pointer's ring and its ripple: another player's hand at a table shows in their colour. */
   tint(colour: THREE.ColorRepresentation) {
     (this.#ring.material as THREE.MeshBasicMaterial).color.set(colour);
@@ -522,7 +582,8 @@ export class HandsView {
       const bob = Math.sin(time * 2.4) * size * 0.05;
       const out = size * 1.35 * this.#iconSide;
       icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
-      icon.visible = this.icon && id !== "feather";
+      // The feather and the fingertip are in the world themselves.
+      icon.visible = this.icon && id !== "feather" && id !== "finger";
     } else this.#icon.visible = false;
 
     // Food landing leaves the ring's impression, spreading and fading where it fell.
@@ -578,7 +639,7 @@ export class HandsView {
       // Leaning back toward the camera, swaying; stroking, it brushes to and fro.
       const wiggle = hands.stroking ? Math.sin(time * 14) * 0.5 : Math.sin(time * 2) * 0.12;
       this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
-      const brush = hands.stroking ? Math.sin(time * 14) * 0.5 : 0;
+      const brush = hands.stroking ? Math.sin(time * 14) * FEATHER_BRUSH : 0;
       feather.position.set(p.x + this.#right.x * brush, p.y + 0.15, p.z + this.#right.z * brush);
       feather.quaternion.copy(camera.quaternion);
       feather.rotateX(-0.5);
