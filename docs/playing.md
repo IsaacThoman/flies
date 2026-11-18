@@ -371,7 +371,7 @@ short one. It retains the values and their units, without repeating the
 behaviour caption. In and out is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, bitter, water, weight on its legs, a male's taste on
-its front legs, wingbeat, the legs stepping on its left and right, and the light, the mean over every facet), and its hunger and thirst, and for each
+its front legs, wingbeat, its legs stepping (the faster side), and the light, the mean over every facet), and its hunger and thirst, and for each
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
 MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow

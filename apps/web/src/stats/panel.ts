@@ -46,7 +46,7 @@ export const REDRAWS = 4;
 const VALUE = { size: 18, color: "#ffffff" };
 const UNIT = { size: 14, color: "#e4f3ff" };
 
-/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out; touch, the most any part of it is touched; the rest 0 when left out. */
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out; touch, the most any part of it is touched; the legs, the faster side's. */
 export const SENSES = [
   ["loomLeft", "Loom L"],
   ["loomRight", "Loom R"],
@@ -60,8 +60,7 @@ export const SENSES = [
   ["grounded", "On legs"],
   ["maleTaste", "Male taste"],
   ["wingbeat", "Wingbeat"],
-  ["legsLeft", "Legs L"],
-  ["legsRight", "Legs R"],
+  ["legs", "Legs"],
   ["light", "Light"],
   ["hunger", "Hunger"],
   ["thirst", "Thirst"],
@@ -315,7 +314,7 @@ export function readSignals(s: StatsState, out: Float32Array) {
   for (let k = 0; k < SENSES.length; k++) {
     const key = SENSES[k][0];
     out[i++] = step(
-      key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : key === "touch" ? touchOf(sensed) : (sensed[key] ?? 0),
+      key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : key === "touch" ? touchOf(sensed) : key === "legs" ? Math.max(sensed.legsLeft ?? 0, sensed.legsRight ?? 0) : sensed[key],
     );
   }
   const command = s.brain?.command;
