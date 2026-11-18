@@ -11,7 +11,7 @@ import type { Forces, Intent } from "../src/index.ts";
 
 const bare: Place = { floor: { kind: "circle", r: 200 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 };
 const DT = 1 / 60;
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const walk: Intent = { ...createIntent(), live: true, speed: 8, walking: true };
 const piece = (kind: PieceKind, x: number, z: number, turns = 0): Piece => ({ kind, x, z, turns, y: 0 });
 

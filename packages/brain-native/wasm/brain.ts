@@ -36,9 +36,9 @@ const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
 // fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers, three floats (maleTaste,
 // hunger, wingbeat), five floats of internal state, three more (bitter, water, thirst), two of temperature, the twelve
-// touch parts, two of the legs, then each odorant at the left antenna and the right; fly_command eight floats; fly_stats two doubles and two uint32s.
+// touch parts, two of the legs, then each odorant at the left antenna and the right; fly_command nine floats; fly_stats two doubles and two uint32s.
 const SENSES_BYTES = 188;
-const COMMAND_BYTES = 32;
+const COMMAND_BYTES = 36;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
 /** fly_senses's clock and sleep, after wingbeat. */
@@ -217,7 +217,7 @@ class WasmBrain implements Brain {
     const rates: Record<string, number> = {};
     for (let r = 0; r < this.#names.length; r++) rates[this.#names[r]] = out[(this.#rates >> 2) + r];
     return {
-      command: { walk: out[c], turn: out[c + 1], back: out[c + 2], escape: out[c + 3], wings: out[c + 4], groom: out[c + 5], feed: out[c + 6], sing: out[c + 7] },
+      command: { walk: out[c], turn: out[c + 1], back: out[c + 2], escape: out[c + 3], wings: out[c + 4], groom: out[c + 5], feed: out[c + 6], sing: out[c + 7], lean: out[c + 8] },
       stats: {
         simMs: this.#view.getFloat64(this.#stats, true),
         wallMs: this.#view.getFloat64(this.#stats + 8, true),

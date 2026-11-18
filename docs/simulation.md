@@ -153,16 +153,17 @@ lives (`packages/body/src/motion.ts` unless noted):
   its head on the near side, and turning beside a wall its legs swing clear;
   between two things too close for it as it faces, they turn it a quarter
   turn if it fits so.
-- **The take-off's direction.** The escape command launches it (380 to 620 mm/s
-  up and 160 to 340 away, by how far past 0.4 it went); the direction is the
-  body's: away from the ball if the ball is in the air, or from the
-  fingertip while it moves fast, else straight ahead.
+- **The take-off's speed.** The escape command launches it (380 to 620 mm/s
+  up and 160 to 340 along its heading, by how far past 0.4 it went). Whether
+  along its heading forward or backward is the brain's `lean` (DNp11 against
+  DNp02, `packages/brain/README.md`, Which way it jumps); it never jumps
+  sideways, since nothing read carries left against right.
 - **Flying on: the tarsal reflex** (`behavior.ts`, see Flight). Off its feet,
   the body keeps a floor under the wings' drive until it lands.
 - **Facing its course.** In the air it turns to face the way it is going (at
   up to 8/s of the angle between), and the brain's `turn` steers on top:
-  thrust is along its body, so a jump away from the ball would otherwise
-  have its wings carry it straight back.
+  thrust is along its body, so a jump backward would otherwise have its
+  wings carry it straight back; turning, it flies off to one side.
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
   air soft forces draw it toward the place's floor boundary and below its ceiling;
   these are place-dependent, not hard clamps.
@@ -201,14 +202,16 @@ commands and the neurons themselves.
 ## Flight
 
 In recorded swoop samples the fly jumped and flew: up for a second
-and a half to three, a few hundred millimetres away from the ball,
-then a glide down onto whatever is under it. Flight is simple physics (lift in
+and a half to three, a few hundred millimetres, then a glide down onto
+whatever is under it. Flight is simple physics (lift in
 proportion to the wings' drive, 0.6 holding its weight, and thrust along its
 body), driven by the brain's flight motor neurons and, while its feet are off
 the ground, by a body reflex standing in for circuitry the model lacks.
 
 **What the brain does.** It decides whether to go: the body takes off only when
-the giant fiber (DNp01) fires, and nothing else starts a take-off. It steers in
+the giant fiber (DNp01) fires, and nothing else starts a take-off. It decides
+whether the jump goes forward or backward (`lean`, DNp11 minus DNp02, read
+when the giant fiber fires). It steers in
 the air (`turn`, 5 rad/s at full). Its own wing drive counts whenever it is
 higher than the reflex's: the hand-wired loom (eyes off) drives the flight motor
 neurons to `wings` 0.8 to 0.9, and the fly then climbs and flies longer.

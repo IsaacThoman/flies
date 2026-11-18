@@ -290,6 +290,8 @@ std::vector<ReadoutSpec> readouts() {
       {"DNg12", "Head-grooming descending neurons DNg12_a, _b and _c", query({{kType, one_of({"DNg12_a", "DNg12_b", "DNg12_c"})}}), 150},
       {"MN9", "Proboscis extension motor neuron", query({{kType, is("MN9")}}), 150},
       {"pIP10", "Courtship song command descending neurons", query({{kType, is("pIP10")}}), 150},
+      {"DNp02", "Looming descending neurons, backward lean before a take-off", query({{kType, is("DNp02")}}), 200},
+      {"DNp11", "Looming descending neurons, forward lean before a take-off", query({{kType, is("DNp11")}}), 200},
   };
 }
 
@@ -426,7 +428,7 @@ double state_of(const Senses& s, StateKey key) { return key < kStateCount ? js::
 double sleep_gate(const Senses& s) { return 1 - kSleepGate * state_of(s, kSleepDepth); }
 
 // Rate, Hz, at which each command reaches 1.
-constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40, kSing = 40;
+constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40, kSing = 40, kLean = 40;
 
 Command decode(const std::vector<double>& r) {
   Command c;
@@ -439,6 +441,7 @@ Command decode(const std::vector<double>& r) {
   c.groom = js::clamp(r[kDNg12] / kGroom, 0, 1);
   c.feed = js::clamp(r[kMN9] / kFeed, 0, 1);
   c.sing = js::clamp(r[kPIP10] / kSing, 0, 1);
+  c.lean = js::clamp((r[kDNp11] - r[kDNp02]) / kLean, -1, 1);
   return c;
 }
 

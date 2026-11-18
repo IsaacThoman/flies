@@ -296,7 +296,7 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     }
     const fly::io::Command c = fly::io::decode(b->brain.rates());
     std::string out = std::to_string(stats.spikes) + " " + std::to_string(stats.active) + " " + hex64(stats.sim_ms) + " |";
-    for (double x : {c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing}) out += " " + hex64(x);
+    for (double x : {c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing, c.lean}) out += " " + hex64(x);
     out += " |";
     for (double x : b->brain.rates()) out += " " + hex64(x);
     out += " |";

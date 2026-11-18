@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { BrainCommand } from "@fly/brain";
 import { BACK_SPEED, Behavior, COMMAND_STALE_MS, ESCAPE_ON, ESCAPE_REFRACTORY, SING_OFF, SING_ON, STANDING_TURN, TURN_RATE, WALK_SPEED } from "../src/index.ts";
 
-const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, ...c });
+const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0, ...c });
 const DT = 1 / 60;
 
 /** Holds a command for `seconds`. */

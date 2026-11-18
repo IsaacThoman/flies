@@ -14,8 +14,9 @@
 //
 // It prints each neuron's rate, the forward-backward index of each side
 // (DNp11 minus DNp02, Hz: Dombrovski et al. 2023 find DNp11 drives forward
-// shifts and take-offs and DNp02 backward ones), then evaluates the criteria
-// the README fixes beforehand (Which way it jumps).
+// shifts and take-offs and DNp02 backward ones), the `lean` command the body
+// would read at that moment, then evaluates the criteria the README fixes
+// beforehand (Which way it jumps).
 
 import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
@@ -62,6 +63,8 @@ type Run = {
   window: Record<Key, number>;
   whole: Record<Key, number>;
   escapePeak: number;
+  /** The `lean` command the body reads when it takes off: at the crossing, or at contact. */
+  lean: number;
 };
 
 const connectome = readConnectomeFile(values.path);
@@ -90,17 +93,19 @@ function run(seed: number, stimulus: Stimulus | null, pulse: Partial<BrainSenses
   const end = stimulus ? stimulus.seconds * 1000 : 300;
   let crossed: number | null = null;
   let escapePeak = 0;
+  let lean = 0;
   for (let t = 0; t < end && crossed === null; t += TICK) {
     const { command } = brain.tick(TICK, senses(t, true));
     totals.push(count());
     escapePeak = Math.max(escapePeak, command.escape);
+    if (t + TICK <= contact || command.escape >= ESCAPE_ON) lean = command.lean;
     if (command.escape >= ESCAPE_ON) crossed = t + TICK;
   }
   const stop = crossed ?? Math.min(contact, end);
   const at = (ms: number) => totals[Math.min(totals.length - 1, Math.round(ms / TICK))];
   const rates = (from: number, to: number) =>
     Object.fromEntries(KEYS.map((k, j) => [k, (at(to)[j] - at(from)[j]) / groups[k].length / ((to - from) / 1000)])) as Record<Key, number>;
-  return { crossed, window: rates(Math.max(0, stop - WINDOW_MS), stop), whole: rates(0, stop), escapePeak };
+  return { crossed, window: rates(Math.max(0, stop - WINDOW_MS), stop), whole: rates(0, stop), escapePeak, lean };
 }
 
 const seeds = values.seeds.split(",").map(Number);
@@ -127,7 +132,7 @@ const index = (r: Record<Key, number>, side: "left" | "right" | "both"): number 
 console.log(`Seeds ${seeds.join(", ")}. Rates per neuron (Hz), range over seeds, in the ${WINDOW_MS} ms before escape reached ${ESCAPE_ON} (or contact).`);
 for (const [name, runs] of results) {
   const crossed = runs.map((r) => r.crossed);
-  console.log(`\n${name}: crossed ${crossed.map((c) => (c === null ? "never" : `${c} ms`)).join(", ")}; escape peak ${range(runs.map((r) => r.escapePeak), 2)}`);
+  console.log(`\n${name}: crossed ${crossed.map((c) => (c === null ? "never" : `${c} ms`)).join(", ")}; escape peak ${range(runs.map((r) => r.escapePeak), 2)}; the lean read then ${runs.map((r) => f(r.lean, 2)).join(" ")}`);
   for (const k of KEYS) console.log(`  ${k.padEnd(13)}${range(runs.map((r) => r.window[k])).padStart(16)}   whole loom ${range(runs.map((r) => r.whole[k]))}`);
   for (const side of ["left", "right", "both"] as const) {
     const xs = runs.map((r) => index(r.window, side));

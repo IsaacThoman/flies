@@ -22,7 +22,7 @@ const close = (a: number, b: number, tolerance = 1e-9) => Math.abs(a - b) <= tol
 
 test("decode turns readout rates into commands with the documented scales", () => {
   const zero = decode({});
-  assert.deepEqual(zero, { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 });
+  assert.deepEqual(zero, { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 });
   const half = decode({
     DNg100: SCALES.walk / 2,
     "DNa02 right": SCALES.turn / 2,
@@ -32,14 +32,17 @@ test("decode turns readout rates into commands with the documented scales", () =
     DNg12: SCALES.groom / 2,
     MN9: SCALES.feed / 2,
     pIP10: SCALES.sing / 2,
+    DNp11: SCALES.lean / 2,
   });
   for (const value of Object.values(half)) assert.ok(close(value, 0.5));
   // Turning is right minus left, toward the side whose DNa02 fires more.
   assert.ok(close(decode({ "DNa02 left": SCALES.turn / 4 }).turn, -0.25));
   assert.ok(close(decode({ "DNa02 left": 10, "DNa02 right": 10 }).turn, 0));
+  // Leaning is DNp11 (forward) minus DNp02 (backward).
+  assert.ok(close(decode({ DNp02: SCALES.lean / 4 }).lean, -0.25));
   // Clamped to the contract's ranges, and nonsense reads as 0.
-  const huge = decode({ DNg100: 1e6, "DNa02 left": 1e6, MDN: 1e6, DNp01: 1e6, flight: 1e6, DNg12: 1e6, MN9: 1e6, pIP10: 1e6 });
-  assert.deepEqual(huge, { walk: 1, turn: -1, back: 1, escape: 1, wings: 1, groom: 1, feed: 1, sing: 1 });
+  const huge = decode({ DNg100: 1e6, "DNa02 left": 1e6, MDN: 1e6, DNp01: 1e6, flight: 1e6, DNg12: 1e6, MN9: 1e6, pIP10: 1e6, DNp02: 1e6 });
+  assert.deepEqual(huge, { walk: 1, turn: -1, back: 1, escape: 1, wings: 1, groom: 1, feed: 1, sing: 1, lean: -1 });
   assert.equal(decode({ DNg100: Number.NaN }).walk, 0);
   assert.equal(decode({ DNg100: -5 }).walk, 0);
 });

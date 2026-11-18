@@ -72,7 +72,7 @@ export const RESTING_TOUCH = 0.4;
  */
 export const PRESS_DEPTH = 0.12;
 export const EDGE_REACH = 0.5;
-/** Faster than this (mm/s) the finger is a threat a take-off goes away from, and the followed fly's eyes look every frame. */
+/** Faster than this (mm/s) the followed fly's eyes look every frame. */
 export const FAST = 60;
 
 /** A fly's body, as the finger meets it: its middle's half width (packages/body/src/crowd.ts), and the underside of its thorax over its feet. */
@@ -276,11 +276,6 @@ export class Finger {
   carries(body: FlyBody) {
     for (let i = 0; i < this.carried; i++) if (this.#on[i] === body) return true;
     return false;
-  }
-
-  /** It is moving fast enough to be a threat, a take-off going away from its tip; null otherwise. */
-  get threat(): Vec3 | null {
-    return this.present && this.speed > FAST ? this.tip : null;
   }
 
   /** Moving fast near a fly (`at`, within `reach` mm), whose eyes should look every frame. */

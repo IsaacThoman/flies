@@ -60,7 +60,6 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS, meter?: Cp
     hands.update(DT, { use, holding: use, eye }, fly, life.pantry);
     life.stimuli.looming.length = 0;
     life.stimuli.looming.push(hands.looming[0]);
-    life.stimuli.threat = hands.ball.active ? hands.ball.position : null;
     if (eyes === "open") {
       see(life, hands, map, light);
       life.light = light;

@@ -754,6 +754,8 @@ So the model's DNp02 and DNp11 carry front against behind, through the gradient 
 
 With the eyes shut, the hand-wired input drives every LC4 of an eye at once, so nothing in it says front or back, and the giant fiber crosses the threshold within 20 to 30 ms, before either DN has fired more than a spike or two: the index is 0 (forward) in 5 of 6 seeds on the left, 4 of 6 on the right, and −50 Hz (one spike, backward) in 5 of 6 with both.
 
+**So it is read.** `lean` is DNp11's mean rate minus DNp02's, both sides together, smoothed over 200 ms (chosen: the time a fly takes to shift its posture before it jumps, Card & Dickinson 2008) and divided by 40 Hz (chosen, as for the other descending neurons; only its sign is used) (Commands). When the giant fiber takes the fly off, the body jumps along its heading, backward if `lean` is below 0 and forward otherwise (`packages/body/src/behavior.ts`, ESCAPE_ON); the game's knowledge of where the ball or the fingertip is no longer enters. Read at the moment of crossing, `lean` has the index's sign in every run above: −1.00 to −0.96 from the front, +0.35 to +0.62 from behind, −0.50 to −0.34 from the right, −0.06 to +0.01 from the left. With the eyes shut it is 0 or −0.06 (one spike of DNp02), so the fly jumps forward or, by that one spike, backward: the brain's answer, with nothing in its input to choose by. It never jumps sideways. Adding the two readouts adds nothing measurable to the brain's cost (four neurons counted among 166,700).
+
 ## Commands
 
 Each command is read from a group's mean firing rate, smoothed exponentially, divided by the rate at which the command reaches 1 and clamped. `stats.rates` reports the smoothed rates by group name.
@@ -768,6 +770,7 @@ Each command is read from a group's mean firing rate, smoothed exponentially, di
 | `groom` | Head-grooming descending neurons DNg12_a, _b, _c | 26 | 150 ms | 60 Hz |
 | `feed` | MN9 (proboscis extension motor neuron) | 2 | 150 ms | 40 Hz |
 | `sing` | pIP10 (the courtship song command descending neurons) | 2 | 150 ms | 40 Hz |
+| `lean` | DNp11 minus DNp02 (forward and backward lean before a take-off; Which way it jumps) | 2 − 2 | 200 ms | ±40 Hz |
 
 No neuron is both driven and read (`wire()` refuses a connectome where one would be, and the tests check it), and nothing outside the network produces a command: each comes from spikes that travelled through it.
 
@@ -1107,7 +1110,7 @@ The whole-animal capture above uses `performance.now()` at both `Life.step` call
 
 From the response matrix (`scripts/report.ts` section a):
 
-- **Looming → escape.** LPLC2 and LC4 drive the giant fiber to 190–230 Hz and the flight power motor neurons to ~100 Hz: a take-off. The game's fallback looming pulse at full strength passes escape 0.5 in 32 ms and falls below 0.3 within 40 ms of fading; at half strength it still passes 0.5, in 32 ms too (seeds 1–3). Other looming-sensitive descending neurons (DNp02, DNp04, DNp11) respond too. Escape stays below 0.3 at rest and under every other sense.
+- **Looming → escape.** LPLC2 and LC4 drive the giant fiber to 190–230 Hz and the flight power motor neurons to ~100 Hz: a take-off. The game's fallback looming pulse at full strength passes escape 0.5 in 32 ms and falls below 0.3 within 40 ms of fading; at half strength it still passes 0.5, in 32 ms too (seeds 1–3). Other looming-sensitive descending neurons respond too, and two of them, DNp02 and DNp11, by where the loom is: they set whether the jump goes backward or forward (Which way it jumps). DNp04 is not read. Escape stays below 0.3 at rest and under every other sense.
 - **Sweet → feed.** The mouth's sugar neurons drive MN9 to 14–16 Hz in the first second (feed 0.35–0.40, peaks 0.61–0.65, seeds 1–3). Held on, feed settles at 0.19–0.24 (seconds 2 to 10), at 0.16–0.18 with the feather resting on its back (notum 0.29, wings 0.16), 0.01–0.02 touched all over at 0.4 and 0 at full strength (0.07–0.08 and 0.01 before touch landed anywhere, when `touch` drove the body's bristles at 10 Hz). Walking stops too: over 20 s of sugar `walk` averaged 0.000–0.036. Before they were chosen by what they are, the nine chosen for driving MN9 reached 30–34 Hz (feed 0.74–0.81); now nothing was chosen for it, and the labellar bristles' sugar neurons alone barely reach it (Not reproduced).
 - **Bitter → no feeding.** Bitter on sugar stops the proboscis: a quarter of `bitter`'s strength takes full sugar's MN9 from 12 Hz to under 1 (Senses), as bitter in sugar does in flies. Alone it drives no readout, and over 20 s it leaves walking a little lower (`walk` 0.39 and 0.23 against 0.43 and 0.26 at rest, seeds 1 and 2; seed 3 stood still either way): nothing makes the fly turn or back away from it.
 - **Water** extends nothing and changes nothing at rest; with sugar it lowers MN9's answer by a third. Thirst scales the water neurons' output, a stand-in that changes little, since nothing they reach extends the proboscis (Thirst).

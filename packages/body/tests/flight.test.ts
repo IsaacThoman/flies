@@ -11,17 +11,17 @@ import { Behavior, FLIGHT_FADE, FLIGHT_HOLD, FLIGHT_WINGS, FlyBody, LAND_WINGS, 
 import type { Forces } from "../src/index.ts";
 
 const DT = 1 / 60;
-const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, ...c });
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0, ...c });
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const open = (ceiling = 320): Place => ({ floor: { kind: "rect", hx: 600, hz: 600 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling });
 
 type Flight = { air: number; distance: number; top: number; landed: boolean; lowest: number; highest: number; wings: number[] };
 
 /** A take-off from where the body stands, then the brain's command `during` (once the giant fiber has fired) until it lands or `limit` s pass. */
-function fly(world: World, start: { x: number; z: number; yaw: number }, during: BrainCommand, threat: Forces["threat"] = null, limit = 10): Flight {
+function fly(world: World, start: { x: number; z: number; yaw: number }, during: BrainCommand, limit = 10): Flight {
   const behavior = new Behavior();
   const body = new FlyBody(world, start);
-  const forces = { ...still, threat };
+  const forces = still;
   // Armed, then the giant fiber fires: the brain's take-off.
   body.step(behavior.update(command(), 0, true, DT), forces, DT);
   body.step(behavior.update(command({ escape: 0.5 }), 0, true, DT), forces, DT);
@@ -78,9 +78,9 @@ test("without a brain there is no reflex either: the fly does nothing at all", (
   assert.equal(stale.reflex, 0);
 });
 
-test("an escape becomes a flight: up for over a second, a few hundred millimetres away from the threat, and down on its feet", () => {
+test("an escape becomes a flight: up for over a second, a few hundred millimetres away, and down on its feet", () => {
   const world = new World(open());
-  const flight = fly(world, { x: 0, z: 0, yaw: 0 }, command({ wings: 0.35 }), { x: 20, y: 5, z: 15 });
+  const flight = fly(world, { x: 0, z: 0, yaw: 0 }, command({ wings: 0.35 }));
   assert.ok(flight.landed, "it landed");
   assert.ok(flight.air > 1 && flight.air < 4, `${flight.air.toFixed(2)} s in the air`);
   assert.ok(flight.distance > 100 && flight.distance < 600, `${flight.distance.toFixed(0)} mm`);
@@ -110,19 +110,22 @@ test("the wings' own sensors feel the drive it flies with, and nothing from the 
   assert.ok(Math.abs(body.wingbeat - 0.5) < 1e-4, `${body.wingbeat}`);
 });
 
-test("it flies away from the threat, not back past it", () => {
-  const world = new World(open());
-  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
-  const behavior = new Behavior();
-  // The ball ahead and to its right, as the Swoop tool brings it in.
-  const threat = { x: -28, y: 5, z: 22 };
-  const forces = { ...still, threat };
-  body.step(behavior.update(command(), 0, true, DT), forces, DT);
-  body.step(behavior.update(command({ escape: 0.5 }), 0, true, DT), forces, DT);
-  for (let t = 0; t < 1; t += DT) body.step(behavior.update(command({ wings: 0.35 }), 0, body.onFeet, DT), forces, DT);
-  const away = body.position.x * -threat.x + body.position.z * -threat.z;
-  assert.ok(away > 0, "further from where the threat was");
-  assert.ok(Math.hypot(body.position.x - threat.x, body.position.z - threat.z) > 100, "well clear of it");
+test("leaning backward, it jumps backward and flies off, never back past where it stood", () => {
+  for (const lean of [-0.4, 0.4]) {
+    const world = new World(open());
+    const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+    const behavior = new Behavior();
+    body.step(behavior.update(command({ lean }), 0, true, DT), still, DT);
+    body.step(behavior.update(command({ escape: 0.5, lean }), 0, true, DT), still, DT);
+    // Heading +z at yaw 0. Jumping backward, its wings would carry it back the way it faced; it turns off that way instead (VANE_RATE).
+    let ahead = 0;
+    for (let t = 0; t < 1; t += DT) {
+      body.step(behavior.update(command({ wings: 0.35 }), 0, body.onFeet, DT), still, DT);
+      ahead = Math.max(ahead, body.position.z);
+    }
+    if (lean > 0) assert.ok(body.position.z > 100, `forward: well clear, ${body.position.z.toFixed(0)} mm`);
+    else assert.ok(ahead <= 0 && Math.hypot(body.position.x, body.position.z) > 100, `backward: never ahead of where it stood (${ahead.toFixed(1)} mm), ended ${Math.hypot(body.position.x, body.position.z).toFixed(0)} mm away`);
+  }
 });
 
 test("under a low ceiling, it stays below it and still comes down", () => {
@@ -135,7 +138,7 @@ test("under a low ceiling, it stays below it and still comes down", () => {
 test("held up by the brain's own wing drive, it flies on past the reflex's hold", () => {
   const world = new World(open());
   const reflexOnly = fly(world, { x: 0, z: 0, yaw: 0 }, command({ wings: 0.3 }));
-  const driven = fly(world, { x: 0, z: 0, yaw: 0 }, command({ wings: 0.7 }), null, 4);
+  const driven = fly(world, { x: 0, z: 0, yaw: 0 }, command({ wings: 0.7 }), 4);
   assert.ok(driven.air > reflexOnly.air + 1, `${driven.air.toFixed(1)} s against ${reflexOnly.air.toFixed(1)} s`);
 });
 
