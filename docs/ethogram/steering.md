@@ -98,6 +98,28 @@ lowest point of the histogram of local-maximum heights between 4 and 20 MAD
 
 A recording counts only if both its cells pass.
 
+### Amendment to the spikes, before the fit
+
+The detector above failed its own checks in six of the eight cells (Results):
+divided by a running median absolute deviation, a spike's height shifts with
+how fast the cell fires, and the histogram of heights has no stable gap.
+Under the protocol as written D1 fails, since only a2_d_13 passes. That result
+stands and is reported. Before any fit on the other recordings, the detector
+was replaced after looking only at the heights of the raw voltage's local
+maxima in each cell, over included time. All eight show noise and spikes
+separated by a gap between 1.75 and 3 mV:
+
+- a spike is a local maximum of the raw voltage that rises at least θ above the
+  lowest point of the 3 ms before it and falls back by at least half that rise
+  within the 3 ms after, at least 2 ms from the next;
+- θ is found as before, at the gap, in 0.25 mV bins from 1 to 15 mV;
+- the three checks are unchanged, taken over included time.
+
+Seen before this amendment: the registered detector's counts and rates in all
+eight cells, and the fit on a2_d_13 alone, the only recording that passed
+(walking slope 7.4 °/s per Hz at τ 0 and d 120 ms, R² 0.08). Nothing else in
+the protocol changes.
+
 ### Rates, states and the yaw sign
 
 Each cell's rate is the model's readout applied to its spikes: exponential
