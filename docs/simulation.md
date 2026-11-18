@@ -61,8 +61,9 @@ pass on what they taste (`packages/brain/README.md`, Thirst).
 
 What changes: nothing it does. Water reaches nothing in the model that
 extends the proboscis, thirsty or not, so the fly never drinks: of 20 flies
-on water, none starts to feed, at any thirst. Away from plain water it grows
-thirsty and stays so.
+on water, none starts to feed, at any thirst. What quenches it is the sweet
+food it does eat, as far as that is a dilute juice or fruit: on syrups and
+honey alone it grows thirsty and stays so.
 
 With them go the fly's daily clock and its need for sleep (`packages/body/src/rhythm.ts`),
 not senses but internal state the connectome can't supply: the morning and evening
