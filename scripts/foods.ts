@@ -2,7 +2,7 @@
 // connectome: its life frame by frame (apps/web/src/life.ts), the brain in
 // process. For docs/world.md's Food.
 //
-//   node scripts/foods.ts [--part feed|places|all] [--place picnic,...] [--seeds 1,2,3] [--hunger 0.7,1] [--seconds 10]
+//   node scripts/foods.ts [--part feed|places|all] [--place picnic,...] [--seeds 1,2,3] [--hunger 0.7,1] [--seconds 10] [--no-smell]
 //
 // Each food is found the same way: the fly stood with its mouth on the food's
 // middle, facing away from the world's middle, at the hunger given, and left
@@ -12,7 +12,8 @@
 // the most `sweet` and `bitter` its brain was sent, and per hunger how many flies ate
 // it, for how long each, and how soon after it was set down. Eating another
 // food it walked to doesn't count. What it does is the brain's choice:
-// nothing here helps it.
+// nothing here helps it. With --no-smell the brain isn't told what the food
+// smells of (Life.smells), as before food smelled.
 
 import { parseArgs } from "node:util";
 import { FLY_LENGTH, MOUTH_AHEAD } from "@fly/body";
@@ -28,6 +29,7 @@ const { values } = parseArgs({
     seeds: { type: "string", default: "1,2,3" },
     hunger: { type: "string", default: "0.7,1" },
     seconds: { type: "string", default: "10" },
+    "no-smell": { type: "boolean", default: false },
   },
 });
 const DT = 1 / 60;
@@ -42,6 +44,7 @@ type Trial = { ate: boolean; first: number; fed: number; sweet: number; bitter: 
 /** One fly, set down with its mouth on `pick(life)`'s food at `hunger`, for `seconds`. */
 function trial(place: Place, seed: number, hunger: number, pick: (life: Life) => Food): Trial {
   const life = new Life(new World(place), new InProcessBrain(data, seed));
+  life.smells = !values["no-smell"];
   const food = pick(life);
   // Facing out from the middle of the world, so its body lies over the food and the place, not off its edge.
   const yaw = Math.hypot(food.x, food.z) > 1 ? Math.atan2(food.x, food.z) : 0;

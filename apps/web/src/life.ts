@@ -53,6 +53,12 @@ export class Life {
    * (packages/brain/README.md, Temperature). scripts/thermotaxis.ts turns it on.
    */
   feelsTemperature = false;
+  /**
+   * Whether the brain is told what its antennae smell. On in the game
+   * (docs/smell-protocol.md); off, the brain as it was before food smelled,
+   * for scripts that compare the two (scripts/foods.ts --no-smell).
+   */
+  smells = true;
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
   /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
@@ -169,7 +175,8 @@ export class Life {
     sent.water = felt.water;
     sent.legsLeft = felt.legsLeft;
     sent.legsRight = felt.legsRight;
-    sent.odor = felt.odor;
+    if (this.smells) sent.odor = felt.odor;
+    else delete sent.odor;
     if (this.feelsTemperature) {
       sent.temperatureLeft = felt.temperatureLeft;
       sent.temperatureRight = felt.temperatureRight;

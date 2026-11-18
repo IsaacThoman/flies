@@ -15,7 +15,7 @@
 
 import type { Vec3 } from "./shapes.ts";
 import type { Odor } from "./tastes.ts";
-import { ODORANTS } from "./tastes.ts";
+import { NO_ODOR, ODORANTS } from "./tastes.ts";
 
 export const PLUME = {
   /** mm²/s: about these small volatiles' diffusivity in air (chosen; Fuller estimates give 6 to 16). */
@@ -47,7 +47,8 @@ export function smellAt(sources: readonly OdorSource[], wind: Readonly<Vec3>, x:
   for (let i = 0; i < sources.length; i++) {
     const s = sources[i];
     const odor = s.odor;
-    if (!odor || s.amount <= 0) continue;
+    // Most food smells of nothing the fly can smell: skip it before its square root and exponential.
+    if (!odor || odor === NO_ODOR || s.amount <= 0) continue;
     const dx = x - s.x;
     const dy = y - s.y;
     const dz = z - s.z;

@@ -108,3 +108,16 @@ The About screen says only what was measured: that it turns toward a food it
 smells (gate 3), and whether, in this assay, that brings it there sooner.
 Homing is expected only near the food: quarter-strength odour barely turns
 it, and nothing here follows the wind upwind.
+
+## Amendment 1, 18 November 2026, before any of its measurements
+
+Added while the reach assay ran, before this check was measured; nothing above
+changes. The food table in [world.md](world.md#food) (`scripts/foods.ts`: a
+fly set down with its mouth on each place's food and each of Feed's, seeds
+1–3, hunger 0.7 and 1, 10 s) runs through the game's `Life`, so its foods now
+smell. It is run on this branch with smell (`Life.smells`, the game's) and
+without (`--no-smell`), paired trial for trial (food, seed, hunger). A trial
+eats if it eats that food at all. **Fails** (a check of the ship rule) if
+fewer trials eat with smell, exact one-sided McNemar p < 0.05 on the
+discordant pairs; every food whose count changes is reported.
+

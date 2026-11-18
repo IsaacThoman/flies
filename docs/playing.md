@@ -370,7 +370,7 @@ cells two to a row on a narrow screen, and its brain beside its day on a
 short one. It retains the values and their units, without repeating the
 behaviour caption. In and out is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
-touch, either antenna, wind, sweet, bitter, water, weight on its legs, a male's taste on
+touch, either antenna, wind, sweet, bitter, water, smell (the strongest odorant at either antenna), weight on its legs, a male's taste on
 its front legs, wingbeat, its legs stepping (the faster side), and the light, the mean over every facet), and its hunger and thirst, and for each
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
