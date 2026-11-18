@@ -49,11 +49,12 @@ export const STATE_KEYS = ["clockMorning", "clockEvening", "clockSleep", "sleepP
 export type StateKey = (typeof STATE_KEYS)[number];
 
 /**
- * The senses that are one intensity each and drive a group of their own; `light` is a picture, handled apart, `hunger`, `thirst` and the
+ * The senses that are one intensity each and drive a group of their own; `light` is a picture and `odor` a strength per odorant and antenna,
+ * handled apart (olfaction.ts), `hunger`, `thirst` and the
  * clock and sleep internal state, not senses, the antennae's temperatures handled apart (thermo.ts), and the touch senses each drive a
  * region of a group (`regions`).
  */
-export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | "thirst" | StateKey | "temperatureLeft" | "temperatureRight" | TouchSense>;
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "odor" | "hunger" | "thirst" | StateKey | "temperatureLeft" | "temperatureRight" | TouchSense>;
 export type SenseSpec = InputSpec & {
   sense: ScalarSense;
   /**

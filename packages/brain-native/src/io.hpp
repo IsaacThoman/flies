@@ -71,6 +71,8 @@ struct Senses {
   /** Touch where it lands, from kTouchEyeLeft on in Sense's order; 0, left out. */
   double touch_parts[kTouchParts] = {};
   double legs_left = 0, legs_right = 0;
+  /** Odor strengths in ODORANTS order, left then right; absent is zero. */
+  double odor_left[5] = {}, odor_right[5] = {};
 };
 
 struct Command {

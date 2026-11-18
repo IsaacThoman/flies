@@ -1,17 +1,194 @@
 # Olfaction in the male CNS model
 
 This study asks whether independently identified olfactory receptor neurons
-(ORNs) can support an honest smell sense. The game currently drives none of
-them. The experiment uses the TypeScript brain, unchanged; no native brain,
-world, default behaviour or sound is changed.
+(ORNs) can support an honest smell sense. Its first round, after the second,
+used the TypeScript brain unchanged. In its [second round](#second-round-the-orns-as-recorded)
+the ORNs answer the world's odorants as they were recorded, and the brain has
+an `odor` sense ([brain README, Smell](../packages/brain/README.md#smell));
+nothing in the game's world smells.
 
-Annotated inputs and graded propagation are established. **Gate 2 still fails
-its declared one-second command-recovery bound after a 60 s washout:** 40/75
-pinned olfactory pulses fail, versus 46/75 matched non-olfactory pulses. The
-controls do not demonstrate persistent olfactory activation: every olfactory
-late readout and population test passes, no cell meets the persistence flag,
-and every final five-second command mean recovers. The record distinguishes a
-failed endpoint from sustained activation. No steering or plume is included.
+**Gate 3 passes; gate 2 fails, as written and as amended, so no odour enters
+the world.** Odour at one antenna turns the fly toward it in 10 of 10 held-out
+seeds, and toward the stronger of two. Five-second pulses still leave the
+commands more than 0.05 from a paired control 60 s later in 44 of 75 trials,
+and matched bristle pulses in 39 of 75, with no population, readout or cell left
+changed. One forced spike almost never moves the commands, so the endpoint is
+not one no input could pass. After that result the maintainers amended gate 2,
+openly and post hoc, to a non-inferiority test against the matched touch: on
+fresh seeds odour is non-inferior by a wide margin, but nine odour pulses
+leave a late readout past its bound, which the amendment kept as a
+requirement, and the amended gate fails on that (as do nine bristle pulses).
+
+## Second round: the ORNs as recorded
+
+The [second-round protocol](olfaction-gates-protocol.md) was committed before
+any measurement it describes, and amended once, before the measurements on the
+configuration it names. Raw outputs stay outside git, as in the first round.
+
+### The first round, again, on today's brain
+
+Slow neuromodulation (#198), the taste neurons chosen by what they are (#186)
+and the transmitter fixes since (#188) changed the brain after the first round,
+so both of its assays ran again on `dev` at `6dab55a0`, unedited. Nothing
+material moved. DM1 at 100 events/s still brings the projection neurons to
+2.15 Hz and the lateral horn to 1.58 Hz on average, the lateral horn is graded
+at every step in every seed, and 20 of 75 pulses fail the one-second command
+bound (28 in the first round). In the recovery follow-up, pinned odour pulses
+fail it in 42 of 75 trials and matched bristle pulses in 42 of 75; the
+calibration's drift is the first round's to four places (pinned walk/turn
+0.1247/0.1218, wandering 0.6013/0.5964), so again unqualified, and again no
+population, late readout or cell stays changed.
+
+### What changed in the fly
+
+Each glomerulus's ORNs now answer ethyl acetate, acetic acid, ethanol, isoamyl
+acetate and CO₂ as their receptor or neuron was recorded answering them, at
+each antenna apart, and the left antenna's less completely traced ORNs count
+their synapses as the right's do (brain README, Smell; the operating point).
+The table also holds each glomerulus's recorded resting rate. On the model with
+the ORNs firing at those rates, gate 3 was measured first and passed (below).
+Before anything else was measured, the brain's tests found what that resting
+firing does here: the antennal lobe's broad local neurons, each summing about
+30,000 ORN synapses in a single compartment, fire at 250–310 Hz, most projection
+neurons fall silent, and the inhibition reaches as far as the backing pathway
+(touch's backing at night 0.24 → 0.06). That is the model's missing dendritic
+compartments and presynaptic gain control, which the first round's limits
+anticipated, not the recordings. Amendment 1 made the model under test the same
+model with the ORNs silent at rest, before any of its measurements. Every
+result below is on it unless it says otherwise.
+
+### Gate 2, with smell
+
+The first round's assay on this model: DM1 at 100 events/s 2.42 Hz in the
+projection neurons and 1.75 Hz in the lateral horn; the lateral horn graded at
+every step in all 15 sequences; 24 of 75 pulses fail the command bound. CO₂'s
+glomerulus now raises backing a little (`back` +0.089 at 100 events/s, +0.026 on
+`dev`): its left neurons count for what the right's do.
+
+The recovery follow-up on this model, 226 runs:
+
+| Context, pulse | Trials | Final 1 s command failures | Late population or readout failures | Persistent-cell flags | Final 5 s means within 0.05 |
+|---|---:|---:|---:|---:|---:|
+| Pinned, olfactory | 75 | 44 (turn 36, walk 14, back 1) | 0 | 0 | 75 |
+| Pinned, bristle | 75 | 39 | 1 readout | 0 | 74 |
+| Wandering, olfactory, 100 events/s | 15 | 1 | 0 | 0 | 15 |
+| Wandering, bristle, 100 events/s | 15 | 1 | 0 | 0 | 15 |
+
+The largest residual is turn +0.168 (pinned DM5 at 200 events/s, seed 21). The
+pinned failures by seed are 23, 4 and 17 of 25.
+
+**What the endpoint measures (Part B).** Thirty runs forced one spike in one
+neuron at the pulse's onset, the lowest body ID of each glomerulus's ORNs and
+of each matched bristle set, on seeds 21–23; every one fired. Two of the 30
+fail the 0.05 bound, and every command's median final-second residual is
+exactly 0: one spike usually changes no later spike at all, and the pair stays
+identical. So under the protocol's rule the original endpoint stands as the
+gate (fewer than half failed); it is not an endpoint no input could pass. The
+pulses' residuals are larger than the single spikes' in walk, turn, back,
+escape, wings and groom (one-sided Mann–Whitney, p from 7 × 10⁻⁴ down to
+2 × 10⁻¹⁴, each under 0.05/8).
+
+**Decision: gate 2 fails.** Five seconds of odour, or of touch on the head's
+bristles, leaves the steering and walking commands on another course a minute
+later, while nothing the populations, readouts or cells show stays changed.
+Part D, the plume, was not run, and no odour is in the world.
+
+### Gate 2, amended after it failed
+
+**This is a post-hoc amendment, made after seeing the result above.** The
+maintainers changed the criterion openly, because the original bound fails a
+matched touch on the head's bristles, a sense the game already delivers, about
+as often as it fails smell (39 of 75 against 44 of 75), so it held smell to a
+stricter bar than the fly's other senses. The original result above stands
+unchanged. The amendment (dated, in [the protocol](olfaction-protocol.md#amendment-17-november-2026-gate-2-against-a-matched-non-olfactory-control))
+was committed before any of its measurements (`1922a8c1`): the same pinned
+assay on fresh seeds 141–148; for each odour pulse and its bristle comparator,
+D = the larger of the largest final-second command residuals, odour less
+bristle; the seed's mean D as the unit; non-inferior when the one-sided 95%
+upper bound of their mean is below δ = 0.05, the original bound; and the
+population, cell, readout and lateral-horn checks kept, each required of every
+odour pulse (`packages/brain/scripts/olfaction-noninferiority.ts`).
+
+| Seed | 141 | 142 | 143 | 144 | 145 | 146 | 147 | 148 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| mean D | 0.0003 | 0.0054 | −0.0076 | 0.0102 | 0.0027 | 0.0053 | 0.0030 | 0.0063 |
+| odour / bristle pulses missing 0.05 | 0 / 0 | 12 / 9 | 11 / 12 | 17 / 14 | 13 / 14 | 17 / 16 | 24 / 21 | 16 / 14 |
+| odour pulses with a late readout past its bound | 0 | 0 | 0 | 5 | 0 | 1 | 3 | 0 |
+
+Mean D 0.0032 (sd 0.0052), upper bound 0.0067: **non-inferior**, by far. Every
+late population is within 1 Hz in every block, no cell is flagged, and the
+lateral horn rises at every step in every seed. But **nine odour pulses leave a
+readout past its bound in the last five seconds** (DNg100 in eight, by more
+than 2 Hz; DNa02-right in two), and the amendment required that of every one,
+so **the amended gate 2 fails**. Nine of the 200 bristle pulses do the same
+(DNa02 nine times, DNg100 once): like the original endpoint, this check
+separates neither sense, but it was fixed as a requirement before the
+measurement and stands. The plume was not run, and nothing in the world
+smells. Across the 200 pulses of each kind the original endpoint failed 110
+odour pulses and 100 bristle pulses.
+
+### Gate 3, steering
+
+Unchanged from the protocol: the brain alone, standing, eyes shut, the wandering
+background on; 5 s of odour after 20 s of rest; T is half the turn with the
+odour on the right less the turn with it on the left. On the model under test,
+seeds 41–50:
+
+| Condition | T, mean (95% interval) | Seeds the predicted way | Verdict |
+|---|---|---:|---|
+| P1: ethyl acetate 1 at one antenna | 0.104 (0.084–0.125) | 10 | toward: **passes** |
+| S1: CO₂ 1 at one antenna | 0.015 (−0.004–0.033) | 4 | not away: fails |
+| S2: ethyl acetate 0.25 | 0.003 (−0.002–0.007) | 5 | fails |
+| S3: ethyl acetate 1 against 0.5 | 0.077 (0.067–0.086) | 10 | toward the stronger: passes |
+| S4: one antenna's DM1 ORNs +100 Hz | 0.055 (0.034–0.077) | 10 | toward: passes |
+| S5: isoamyl acetate 1 | 0.021 (0.010–0.033) | 10 toward | no prediction |
+
+On the model with resting firing, seeds 31–40: P1 0.077 (0.064–0.090, 10 of
+10), S1 0.015 (2 of 10 away), S2 0.020 (8 of 10, passes), S3 0.037 (10 of 10),
+S4 0.032 (10 of 10), S5 0.099 (10 of 10). Gate 3 passes on both. CO₂ is not
+avoided by turning on either, though on the model under test it backs the fly
+a little (`back` +0.035 over the 5 s).
+
+### The mushroom body
+
+Odours at full strength at both antennae fire 7.5% of the Kenyon cells
+(ethyl acetate), 5.0% (isoamyl acetate), 2.8% (CO₂), 1.7% (ethanol), 1.1%
+(acetic acid), and 12.2% all five at once, alike in seeds 1–3; none fire
+without odour (`packages/brain/scripts/olfaction-kc.ts`). That is a fly's sparseness, about
+5–10% (brain README, Smell).
+
+### The next experiment
+
+Gate 2's failure is a trajectory difference that one spike doesn't start and a
+five-second pulse of either sense does. Perturbations of graded size from
+identical checkpoints (1, 10, 100, 1,000 forced spikes, olfactory and bristle)
+would find where two runs part and whether the parting grows; recovery could
+then be judged against the parting the smallest effective perturbation leaves.
+That must be preregistered as such: this round's rule didn't allow it.
+Separately, a resting antennal lobe needs local neurons that don't saturate:
+compartmentalised local neurons or presynaptic inhibition, from measurements.
+
+### Reproduce
+
+From the repository root, the connectome, anatomy and annotations in place:
+
+```sh
+node packages/brain/scripts/olfaction.ts --part simulate --seeds 1 > /tmp/olfaction-seed1.json
+# ... seeds 2 and 3, then olfaction-summary.ts as in the first round; the recovery follow-up as below.
+node packages/brain/scripts/olfaction-divergence.ts --out /tmp/olfaction-kicks --seeds 21,22,23
+node packages/brain/scripts/olfaction-divergence.ts --out /tmp/olfaction-kicks --reduce --controls /tmp/olfaction-controls
+node packages/brain/scripts/olfaction-steering.ts --out /tmp/olfaction-steering
+node packages/brain/scripts/olfaction-steering.ts --out /tmp/olfaction-steering --reduce
+node packages/brain/scripts/olfaction-kc.ts
+```
+
+The steering runs on seeds 41–50 by default. The model with resting firing is
+commit `5c5eac20`, where the same script ran seeds 31–40.
+
+## First round
+
+Everything from here on is the first round as it was recorded, on `dev` at
+`c53a64c0`, before the ORNs answered anything.
 
 The questions are sequential gates: identify inputs from annotations; establish
 stable, graded, reversible responses with defensible valence; establish antenna

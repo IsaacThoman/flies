@@ -122,6 +122,7 @@ export interface NativeBrainBridge {
   rateNames(): string[];
   /**
    * Queues `dtMs` of fly time under these senses (`scalars` in SENSE_ORDER;
+   * then five odor strengths per antenna, left then right, in ODORANTS order;
    * the light arrays one value per facet, or null with the eyes shut).
    * Never blocks: the brain thread picks it up.
    */

@@ -112,6 +112,16 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     if (wiring_.senses[k].spec.last) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
   }
+  // The receptor neurons of smell after even those, so every earlier input's stream is as it was.
+  smell_ = olfaction::wire(connectome);
+  std::unordered_set<uint32_t> read;
+  for (const auto& group : wiring_.readouts) read.insert(group.neurons.begin(), group.neurons.end());
+  for (const auto& group : smell_) {
+    for (uint32_t i : group.neurons) {
+      if (read.count(i)) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven by \"" + group.name + "\" and read");
+    }
+    smell_inputs_.push_back(sim_.add_input(group.name, group.neurons, 0));
+  }
   // runtime.ts finds the learning connections only when first needed, to keep building quick; natively building
   // them takes a few ms, so they are found at once, which gives the same results.
   learning::MushroomBody body(connectome);
@@ -162,6 +172,8 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     const io::Group& group = wiring_.reinforcement[k];
     sim_.set_rate(reinforcement_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense));
   }
+  const auto odor = olfaction::odor_of(senses);
+  for (size_t k = 0; k < smell_.size(); k++) sim_.set_rate(smell_inputs_[k], olfaction::rate(smell_[k], odor));
   const double hunger = io::hunger_of(senses);
   modulation_.set_state(senses, hunger);
   modulation_.update(0);

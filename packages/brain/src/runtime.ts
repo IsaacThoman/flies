@@ -11,6 +11,8 @@ import type { Wiring } from "./io.ts";
 import { Modulation } from "./modulation.ts";
 import { LEARNING, EMPTY_LAYOUT_HASH, MushroomBody, emptyMemory, readMemory } from "./learning.ts";
 import type { LearningParameters } from "./learning.ts";
+import { ODORANTS, odorOf, ornRate, wireOlfaction } from "./olfaction.ts";
+import type { OrnGroup } from "./olfaction.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES, REGION_TAU, regionOf } from "./regions.ts";
@@ -36,6 +38,12 @@ export type BrainOptions = {
   learning?: LearningParameters | false;
   /** Turn the internal state's background drive off (it is on by default). */
   spontaneous?: boolean;
+  /**
+   * For experiments: the olfactory receptor neurons fire at their recorded
+   * resting rates (off by default: in this model those rates drive the
+   * antennal lobe's broad local neurons to saturation; README, Smell).
+   */
+  restingSmell?: boolean;
   /** The eyes' columns (eye-columns.ts by default), for tests on a synthetic connectome. */
   eyeColumns?: { readonly right: readonly EyeColumn[]; readonly left: readonly EyeColumn[] };
 };
@@ -61,6 +69,8 @@ export class FlyBrain implements Brain {
   /** Slow neuromodulation (modulation.ts): every modulatory neuron's level, and what its receptors do. */
   readonly modulation: Modulation;
   readonly spontaneous: boolean;
+  /** Whether the olfactory receptor neurons fire at rest (BrainOptions.restingSmell). */
+  readonly restingSmell: boolean;
   /** What the mushroom body has learned, and how it learns; null when it doesn't, or the connectome has no Kenyon cell. */
   readonly learning: MushroomBody | null;
   /** Each neuron's region, an index into REGIONS. */
@@ -77,6 +87,9 @@ export class FlyBrain implements Brain {
   #release: { route: number; name: string }[] = [];
   // The water neurons' input, whose output gain thirst sets.
   #water = "";
+  /** Every glomerulus's receptor neurons, side by side (olfaction.ts). */
+  readonly smell: readonly OrnGroup[];
+  #odor = new Float64Array(2 * ODORANTS.length);
   /** The eyes' gain last set (SLEEP_EYES), and each eye's rates and L1's withdrawals scaled by it. */
   #eyeGain = 1;
   #gained: Record<"left" | "right", { rates: Float64Array; withdrawals: Float64Array }> | null = null;
@@ -171,6 +184,15 @@ export class FlyBrain implements Brain {
     const learning = options.learning === false ? null : new MushroomBody(connectome, options.learning ?? LEARNING);
     this.learning = learning && learning.kcs.length > 0 ? learning : null;
     if (this.learning) this.sim.setSpikeLog(this.learning.watched);
+    // The receptor neurons of smell after even those: with no odour (and no
+    // resting firing) every stream is as it was before them.
+    this.smell = wireOlfaction(connectome);
+    this.restingSmell = options.restingSmell ?? false;
+    const readouts = new Set(this.wiring.readouts.flatMap((group) => [...group.neurons]));
+    for (const { name, neurons, spontaneous } of this.smell) {
+      for (const i of neurons) if (readouts.has(i)) throw new Error(`Neuron ${i} is both driven by "${name}" and read`);
+      this.sim.addInput(name, neurons, this.restingSmell ? spontaneous : 0);
+    }
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
     this.spontaneous = options.spontaneous ?? true;
@@ -201,6 +223,8 @@ export class FlyBrain implements Brain {
     for (const [name, rate] of senseRates(this.wiring, senses)) this.sim.setRate(name, rate);
     for (const regional of this.#regional) this.#touch(regional, senses);
     for (const { spec, maxRate } of this.wiring.reinforcement) this.sim.setRate(spec.name, maxRate * intensity(senses, spec.sense));
+    odorOf(senses, this.#odor);
+    for (const group of this.smell) this.sim.setRate(group.name, ornRate(group, this.#odor, this.restingSmell));
     const hunger = hungerOf(senses);
     this.modulation.setState(senses, hunger, stateOf);
     this.modulation.update(0);

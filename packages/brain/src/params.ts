@@ -4,6 +4,7 @@
 // the README explains each.
 
 import type { Connectome, NeuronQuery } from "./format.ts";
+import { ORN_TABLE } from "./orn-table.ts";
 
 export type TransmitterFix = {
   /** What the fix is and why. */
@@ -23,6 +24,8 @@ export type CompletenessFix = {
   reason: string;
   /** The group, both sides; each side is its neurons with that soma (or root) side. */
   select: NeuronQuery;
+  /** Each type the selection picks is a group of its own (found together: one pass over the connectome for all of them). */
+  eachType?: boolean;
 };
 
 export type OperatingPoint = {
@@ -150,7 +153,30 @@ const jo = (zone: string): CompletenessFix => ({
   select: { superClass: "cb_sensory", type: new RegExp(`^JO-${zone}`) },
 });
 
-export const COMPLETENESS_FIXES: readonly CompletenessFix[] = [jo("C"), jo("E"), jo("F")];
+// The olfactory receptor neurons, glomerulus by glomerulus. A fly's two
+// antennae carry the same neurons, which each glomerulus receives from both
+// sides (Stocker 1994; Couto et al. 2005), but here the left antenna's nerve
+// was traced less completely: in 49 of 53 glomeruli its neurons have fewer
+// output synapses, a median 1.5 times fewer, each neuron fewer too, while
+// both sides' reach the same partner types, ipsilateral and contralateral
+// apart, in the same proportions (cosine similarity 0.95 or more in 42
+// glomeruli). Left as they are, where the two sides' partners are less alike
+// than the least alike Johnston's organ zone corrected above (C, 0.75): DA3
+// (0.72), VA1v (0.62) and VM6l (0.69, whose left neurons are fragments of 20
+// synapses each). scripts/olfaction.ts prints the comparison.
+export const ORN_UNCORRECTED: readonly string[] = ["DA3", "VA1v", "VM6l"];
+const ORN_CORRECTED = new Set(ORN_TABLE.map((row) => `ORN_${row[0]}`).filter((t) => !ORN_UNCORRECTED.includes(t.slice(4))));
+
+export const COMPLETENESS_FIXES: readonly CompletenessFix[] = [
+  jo("C"),
+  jo("E"),
+  jo("F"),
+  {
+    reason: "Olfactory receptor neurons, glomerulus by glomerulus: the same partners on both sides, but the left antenna's nerve traced less completely",
+    select: { superClass: "cb_sensory", class: "olfactory", type: (t: string) => ORN_CORRECTED.has(t) },
+    eachType: true,
+  },
+];
 
 export const OPERATING_POINT: OperatingPoint = {
   // Shiu et al. 2024's w_syn, for both signs.
@@ -277,19 +303,35 @@ export function saturatedCounts(count: Uint16Array, saturation: number): Uint16A
  */
 export function completenessFactors(connectome: Connectome, fixes: readonly CompletenessFix[]): Map<number, number> {
   const out = new Map<number, number>();
+  const synapses = (neurons: ArrayLike<number>) => {
+    let total = 0;
+    for (let k = 0; k < neurons.length; k++) for (let e = connectome.ptr[neurons[k]]; e < connectome.ptr[neurons[k] + 1]; e++) total += connectome.count[e];
+    return total;
+  };
+  const correct = (left: ArrayLike<number>, right: ArrayLike<number>) => {
+    const l = synapses(left);
+    const r = synapses(right);
+    if (l === 0 || r === 0 || l === r) return;
+    const [weaker, factor] = l < r ? [left, r / l] : [right, l / r];
+    for (let k = 0; k < weaker.length; k++) out.set(weaker[k], factor);
+  };
   for (const fix of fixes) {
     const left = connectome.find({ ...fix.select, side: "left" });
     const right = connectome.find({ ...fix.select, side: "right" });
-    const synapses = (neurons: Uint32Array) => {
-      let total = 0;
-      for (const i of neurons) for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) total += connectome.count[e];
-      return total;
-    };
-    const l = synapses(left);
-    const r = synapses(right);
-    if (l === 0 || r === 0 || l === r) continue;
-    const [weaker, factor] = l < r ? [left, r / l] : [right, l / r];
-    for (const i of weaker) out.set(i, factor);
+    if (!fix.eachType) {
+      correct(left, right);
+      continue;
+    }
+    // Types in the order they first appear among the left's neurons, then the right's.
+    const byType = new Map<string, { left: number[]; right: number[] }>();
+    for (const [side, neurons] of [["left", left], ["right", right]] as const) {
+      for (const i of neurons) {
+        const type = connectome.columns.type.value(i);
+        if (!byType.has(type)) byType.set(type, { left: [], right: [] });
+        byType.get(type)![side].push(i);
+      }
+    }
+    for (const { left: l, right: r } of byType.values()) correct(l, r);
   }
   return out;
 }

@@ -26,7 +26,7 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 35, kCommands = 8, kStats = 4;
+constexpr int kScalars = 45, kCommands = 8, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
 // And thirst, which is 1 the same way.
@@ -39,7 +39,10 @@ constexpr int kTemperatureLeft = 19, kTemperatureRight = 20;
 constexpr int kTouchParts = 21;
 // Where the legs' stepping is, left and right; a game that sends fewer has its legs still, 0.
 constexpr int kLegs = 33;
-static_assert(kTouchParts + FLY_TOUCH_PARTS == kLegs && kLegs + 2 == kScalars, "the touch parts, then the legs, are the last scalars");
+static_assert(kTouchParts + FLY_TOUCH_PARTS == kLegs, "the legs come after the touch parts");
+// Then each odorant at the left antenna and the right (ODORANTS in packages/brain/src/olfaction.ts).
+constexpr int kOdor = kLegs + 2, kOdorants = 5;
+static_assert(kOdor + 2 * kOdorants == kScalars, "the odours are the last scalars");
 enum Status { kLoading, kRunning, kFailed };
 
 struct BrainHost {
@@ -178,6 +181,8 @@ void *Run(void *arg) {
       scalars[kLegs], scalars[kLegs + 1],
     };
     std::copy(scalars + kTouchParts, scalars + kTouchParts + FLY_TOUCH_PARTS, senses.touch_parts);
+    std::copy(scalars + kOdor, scalars + kOdor + kOdorants, senses.odor_left);
+    std::copy(scalars + kOdor + kOdorants, scalars + kOdor + 2 * kOdorants, senses.odor_right);
     fly_command c = {};
     fly_stats stats = {};
     char message[512] = "";

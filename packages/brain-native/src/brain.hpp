@@ -19,6 +19,7 @@
 #include "io.hpp"
 #include "modulation.hpp"
 #include "learning.hpp"
+#include "olfaction.hpp"
 #include "sim.hpp"
 #include "state.hpp"
 #include "thermo.hpp"
@@ -102,6 +103,8 @@ class Brain {
   Simulation sim_;
   InternalState state_;
   Modulation modulation_;
+  std::vector<olfaction::Group> smell_;
+  std::vector<uint32_t> smell_inputs_;
   std::vector<uint32_t> sense_inputs_;
   // For each group of touch regions (by its place in wiring_.senses): each neuron's rate, and each region's last set.
   struct Regional {

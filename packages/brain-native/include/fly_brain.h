@@ -67,6 +67,8 @@ typedef struct fly_senses {
   float touch_parts[FLY_TOUCH_PARTS];
   /** How fast the legs on its left and right move through their steps, 0 (still) to 1 (20 mm/s); 0, left out. */
   float legs_left, legs_right;
+  /** Odor strengths 0..1 in ODORANTS order: ethyl acetate, acetic acid, ethanol, isoamyl acetate, CO2. Zero-initialised = no odour. */
+  float odor_left[5], odor_right[5];
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

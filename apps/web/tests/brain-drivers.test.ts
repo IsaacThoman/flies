@@ -445,6 +445,16 @@ test("the native driver passes the eyes' light through its own arrays, and repor
   assert.equal(driver.error, "native trouble");
 });
 
+test("the native driver appends odor strengths and clears absent odor", () => {
+  const fake = fakeBridge();
+  fake.setStatus("running");
+  const driver = new NativeBrainDriver(fake.bridge);
+  driver.tick(16, { ...RESTING_SENSES, odor: { left: [0.3, Number.NaN, -1, 2], right: [0, 1] } });
+  assert.deepEqual(fake.submitted.at(-1)!.scalars.slice(SENSE_ORDER.length), [Math.fround(0.3), Number.NaN, -1, 2, 0, 0, 1, 0, 0, 0]);
+  driver.tick(16, RESTING_SENSES);
+  assert.deepEqual(fake.submitted.at(-1)!.scalars.slice(SENSE_ORDER.length), Array(10).fill(0));
+});
+
 test("the meter measures spikes per second of fly time", () => {
   const meter = new BrainMeter();
   const driver = { status: "running", state: state(), stateAt: 0 } as unknown as WorkerBrainDriver;

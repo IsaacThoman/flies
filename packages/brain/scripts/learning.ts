@@ -1,6 +1,6 @@
 // What the mushroom body learns (README, Learning).
 //
-//   node packages/brain/scripts/learning.ts [--part survey,assay,dishes,colours] [--light blue=0.565,...,table=0.65] [--seeds 1,2,3] [--path connectome.bin]
+//   node packages/brain/scripts/learning.ts [--part survey,assay,smells,dishes,colours] [--light blue=0.565,...,table=0.65] [--seeds 1,2,3] [--path connectome.bin]
 //
 // (survey) What reaches the mushroom body through the game's senses: each
 // scalar sense alone at full strength for 1 s and every stimulus of the vision
@@ -27,6 +27,9 @@
 // commands during each test odour after training, with learning less without.
 // Ranges are over seeds and both odours as the CS+.
 //
+// (smells) The same with the brain's own smell (src/olfaction.ts): ethyl
+// acetate and isoamyl acetate at full strength at both antennae.
+//
 // (colours) How distinct dishes of these brightnesses (--light) are to the
 // KCs and to the visual projection neurons that synapse onto them, before any
 // learning, and whether each can be told from the bare table: each swings into
@@ -48,6 +51,7 @@
 
 import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
+import { ODORANTS } from "../src/olfaction.ts";
 import { FlyBrain } from "../src/runtime.ts";
 import { BATTERY, facetAngles, loom, render, separation } from "../src/stimuli.ts";
 import { PIECE_LIGHT, SCENE } from "../../../scripts/ethogram/training.ts";
@@ -159,9 +163,36 @@ if (parts.has("survey")) {
   }
 }
 
+// An odour assay's two odours, and how each is given: what to set up in a new brain, and the senses for an odour (or none) each tick.
+type Delivery = { odours: readonly [string, string]; setUp(brain: FlyBrain): (odour: string | null) => Partial<BrainSenses> };
+const deliveries: [string, Delivery][] = [];
 if (parts.has("assay")) {
   const ORN = { DM1: c.find({ superClass: "cb_sensory", class: "olfactory", type: "ORN_DM1" }), VA2: c.find({ superClass: "cb_sensory", class: "olfactory", type: "ORN_VA2" }) };
-  type Odour = keyof typeof ORN;
+  deliveries.push([
+    "assay",
+    {
+      odours: ["DM1", "VA2"],
+      setUp(brain) {
+        for (const odour of Object.keys(ORN)) brain.sim.addInput(`odour ${odour}`, ORN[odour as keyof typeof ORN]);
+        return (odour) => {
+          for (const o of Object.keys(ORN)) brain.sim.setRate(`odour ${o}`, o === odour ? 100 : 0);
+          return {};
+        };
+      },
+    },
+  ]);
+}
+if (parts.has("smells")) {
+  // The brain's own smell (README, Smell): the odour at full strength at both antennae.
+  const at = (k: number) => ODORANTS.map((_, j) => (j === k ? 1 : 0));
+  const SMELLS: Record<string, number[]> = { "ethyl acetate": at(ODORANTS.indexOf("ethylAcetate")), "isoamyl acetate": at(ODORANTS.indexOf("isoamylAcetate")) };
+  deliveries.push([
+    "smells",
+    { odours: ["ethyl acetate", "isoamyl acetate"], setUp: () => (odour) => (odour === null ? {} : { odor: { left: SMELLS[odour], right: SMELLS[odour] } }) },
+  ]);
+}
+for (const [part, delivery] of deliveries) {
+  type Odour = string;
   const US = {
     loom: (t: number) => (t >= 0 && t < 2 && t % 0.5 < 0.1 ? { loomLeft: 1, loomRight: 1 } : {}),
     sugar: (t: number) => (t >= 0 && t < 0.8 ? { sweet: 1 } : {}),
@@ -182,7 +213,7 @@ if (parts.has("assay")) {
   // One trial: the odour responses (spikes during the 1-s test odour less the second before) of each MBON group and the commands' means during each test odour, after training.
   const trial = (seed: number, cs: Odour, us: keyof typeof US, pairing: Pairing, learns: boolean) => {
     const brain = new FlyBrain(c, { seed, ...(learns ? {} : { learning: false as const }) });
-    for (const odour of Object.keys(ORN) as Odour[]) brain.sim.addInput(`odour ${odour}`, ORN[odour]);
+    const smell = delivery.setUp(brain);
     brain.sim.setRecording(true);
     const r = brain.sim.recording!;
     const count = () => Object.fromEntries(Object.entries(MBONS).map(([name, neurons]) => [name, spikesOf(r, neurons)])) as Record<Readout, number>;
@@ -194,8 +225,8 @@ if (parts.has("assay")) {
       for (let k = 0; k < steps; k++) {
         const t = (k * TICK) / 1000;
         const on = odour !== null && t >= odourAt && t < odourAt + 1;
-        for (const o of Object.keys(ORN) as Odour[]) brain.sim.setRate(`odour ${o}`, on && o === odour ? 100 : 0);
-        const state = brain.tick(TICK, { ...RESTING_SENSES, ...(usAt === null ? {} : US[us](t - usAt)) });
+        const smelled = smell(on ? odour : null);
+        const state = brain.tick(TICK, { ...RESTING_SENSES, ...smelled, ...(usAt === null ? {} : US[us](t - usAt)) });
         for (const key of keys) commands[key] += state.command[key] / steps;
       }
       const after = count();
@@ -209,7 +240,7 @@ if (parts.has("assay")) {
       const response = Object.fromEntries(Object.keys(MBONS).map((name) => [name, on.spikes[name as Readout] - base.spikes[name as Readout]])) as Record<Readout, number>;
       return { response, commands: on.commands };
     };
-    const other: Odour = cs === "DM1" ? "VA2" : "DM1";
+    const other: Odour = cs === delivery.odours[0] ? delivery.odours[1] : delivery.odours[0];
     run(2, null, 0, null);
     // The KCs each odour fires in its first test.
     const responding = (odour: Odour) => {
@@ -246,12 +277,12 @@ if (parts.has("assay")) {
     return { plus: test(cs), minus: test(other), weights, changed: brain.learning ? changed(brain) : 0 };
   };
 
-  console.log("\n(assay) After training, learning on against the same brain without it (same seed and schedule). Response: an MBON group's spikes during the 1-s test odour less the second before, on / off. Commands: on - off during the test odour. CS+ then CS-; range over seeds and both odours as CS+.");
+  console.log(`\n(${part}) After training, learning on against the same brain without it (same seed and schedule). Response: an MBON group's spikes during the 1-s test odour less the second before, on / off. Commands: on - off during the test odour. CS+ then CS-; range over seeds and both odours as CS+.`);
   for (const us of ["loom", "sugar"] as const) {
     for (const pairing of ["forward", "backward", "unpaired", "none"] as const) {
       if (us === "sugar" && pairing === "none") continue;
       const rows: { on: ReturnType<typeof trial>; off: ReturnType<typeof trial> }[] = [];
-      for (const seed of seeds) for (const cs of ["DM1", "VA2"] as const) rows.push({ on: trial(seed, cs, us, pairing, true), off: trial(seed, cs, us, pairing, false) });
+      for (const seed of seeds) for (const cs of delivery.odours) rows.push({ on: trial(seed, cs, us, pairing, true), off: trial(seed, cs, us, pairing, false) });
       console.log(`${pairing === "none" ? "no US" : `${us}, ${pairing}`}: synapses changed ${range(rows.map((x) => x.on.changed), 0)}`);
       for (const side of ["plus", "minus"] as const) {
         console.log(`  synapses of the ${side === "plus" ? "CS+" : "CS-"}'s KCs, after training / before: ` + TAUGHT.map((id) => `${id} ${f(mean(rows.map((x) => x.on.weights[side][id])))} (${range(rows.map((x) => x.on.weights[side][id]))})`).join(", "));
