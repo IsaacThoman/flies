@@ -7,12 +7,17 @@ the ORNs answer the world's odorants as they were recorded, and the brain has
 an `odor` sense ([brain README, Smell](../packages/brain/README.md#smell));
 nothing in the game's world smells.
 
-**Gate 3 passes; gate 2 still fails, so no odour enters the world.** Odour at
-one antenna turns the fly toward it in 10 of 10 held-out seeds, and toward the
-stronger of two. Five-second pulses still leave the commands more than 0.05
-from a paired control 60 s later in 44 of 75 trials, and matched bristle pulses
-in 39 of 75, with no population, readout or cell left changed. One forced spike
-almost never moves the commands, so the endpoint is not one no input could pass.
+**Gate 3 passes; gate 2 fails, as written and as amended, so no odour enters
+the world.** Odour at one antenna turns the fly toward it in 10 of 10 held-out
+seeds, and toward the stronger of two. Five-second pulses still leave the
+commands more than 0.05 from a paired control 60 s later in 44 of 75 trials,
+and matched bristle pulses in 39 of 75, with no population, readout or cell left
+changed. One forced spike almost never moves the commands, so the endpoint is
+not one no input could pass. After that result the maintainers amended gate 2,
+openly and post hoc, to a non-inferiority test against the matched touch: on
+fresh seeds odour is non-inferior by a wide margin, but nine odour pulses
+leave a late readout past its bound, which the amendment kept as a
+requirement, and the amended gate fails on that (as do nine bristle pulses).
 
 ## Second round: the ORNs as recorded
 
@@ -87,6 +92,40 @@ escape, wings and groom (one-sided Mann–Whitney, p from 7 × 10⁻⁴ down to
 bristles, leaves the steering and walking commands on another course a minute
 later, while nothing the populations, readouts or cells show stays changed.
 Part D, the plume, was not run, and no odour is in the world.
+
+### Gate 2, amended after it failed
+
+**This is a post-hoc amendment, made after seeing the result above.** The
+maintainers changed the criterion openly, because the original bound fails a
+matched touch on the head's bristles, a sense the game already delivers, about
+as often as it fails smell (39 of 75 against 44 of 75), so it held smell to a
+stricter bar than the fly's other senses. The original result above stands
+unchanged. The amendment (dated, in [the protocol](olfaction-protocol.md#amendment-17-november-2026-gate-2-against-a-matched-non-olfactory-control))
+was committed before any of its measurements (`1922a8c1`): the same pinned
+assay on fresh seeds 141–148; for each odour pulse and its bristle comparator,
+D = the larger of the largest final-second command residuals, odour less
+bristle; the seed's mean D as the unit; non-inferior when the one-sided 95%
+upper bound of their mean is below δ = 0.05, the original bound; and the
+population, cell, readout and lateral-horn checks kept, each required of every
+odour pulse (`packages/brain/scripts/olfaction-noninferiority.ts`).
+
+| Seed | 141 | 142 | 143 | 144 | 145 | 146 | 147 | 148 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| mean D | 0.0003 | 0.0054 | −0.0076 | 0.0102 | 0.0027 | 0.0053 | 0.0030 | 0.0063 |
+| odour / bristle pulses missing 0.05 | 0 / 0 | 12 / 9 | 11 / 12 | 17 / 14 | 13 / 14 | 17 / 16 | 24 / 21 | 16 / 14 |
+| odour pulses with a late readout past its bound | 0 | 0 | 0 | 5 | 0 | 1 | 3 | 0 |
+
+Mean D 0.0032 (sd 0.0052), upper bound 0.0067: **non-inferior**, by far. Every
+late population is within 1 Hz in every block, no cell is flagged, and the
+lateral horn rises at every step in every seed. But **nine odour pulses leave a
+readout past its bound in the last five seconds** (DNg100 in eight, by more
+than 2 Hz; DNa02-right in two), and the amendment required that of every one,
+so **the amended gate 2 fails**. Nine of the 200 bristle pulses do the same
+(DNa02 nine times, DNg100 once): like the original endpoint, this check
+separates neither sense, but it was fixed as a requirement before the
+measurement and stands. The plume was not run, and nothing in the world
+smells. Across the 200 pulses of each kind the original endpoint failed 110
+odour pulses and 100 bristle pulses.
 
 ### Gate 3, steering
 
