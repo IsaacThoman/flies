@@ -400,7 +400,7 @@ export const REGIONS: readonly Region[] = [
   {
     id: "proprioceptors",
     name: "Proprioceptors",
-    description: "Body proprioceptors recorded by organ but not by place: campaniform sensilla (strain sensors; the model's `grounded` drives the legs' as load sensors, `wingbeat` the wings' and halteres' with each stroke), chordotonal organs and hair plates.",
+    description: "Body proprioceptors recorded by organ but not by place: campaniform sensilla (strain sensors; the model's `grounded` drives the legs' as load sensors, `wingbeat` the wings' and halteres' with each stroke), chordotonal organs and hair plates (the legs' femoral chordotonal claw and club neurons and hair plates fire as the legs step).",
     place: "the chordotonal organs (in the femur) and hair plates in the legs; the campaniform sensilla, by their nerves, mostly at the bases of the wings and halteres, a few at the legs' joints; the exact places aren't recorded",
     side: "both",
     neurons: 964,

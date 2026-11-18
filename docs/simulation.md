@@ -18,6 +18,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `bitter` | The same way, from food that is bitter, by its caffeine: dropped Coffee, an espresso (1), and the restaurant's espresso cup and dropped Bitter sugar, sugar soaked in espresso (0.85: the sugar dissolved in it thins the caffeine). |
 | `water` | The same way, from what the water-sensing neurons answer in a food: plain water (dropped Water, the windowsill's basil saucer and the greenhouse's saucer) 1, and a dilute juice or fruit as much as its sugar leaves them, from 1 (tomato, lemon) to a third (grape, banana); syrups, honey, jam and anything holding more than 1 M of sugar, none ([the world's food](world.md#food)). |
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
+| `legsLeft`, `legsRight` | How fast the legs on each side move through their steps, while it stands: its speed over the ground less (the inner side) or plus (the outer) its turning rate times how far its feet stand out (0.88 mm), as a share of 20 mm/s, about the fastest a fly walks. 0 standing still and in the air. It drives that side's legs' chordotonal claw and club neurons and hair plates (`packages/brain/README.md`, The legs' proprioceptors). |
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (on this device or at a table with others; every fly is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 | `hunger` | Not a sense: how hungry it is (below). |
 | `thirst` | Not a sense: how thirsty it is (below). |
@@ -216,8 +217,9 @@ neurons to `wings` 0.8 to 0.9, and the fly then climbs and flies longer.
 `TARSAL_ONSET`). In a fly, losing contact with the ground under its feet starts
 the wings beating and keeps them going until its feet touch something again
 (Fraenkel 1932): a fly held in the air flies for as long as its feet find
-nothing. The model has nothing that does it. Leaving the ground silences only
-the legs' 13 load sensors, which changes nothing measurable, and the wings' own
+nothing. The model has nothing that does it. Leaving the ground silences the
+legs' 13 load sensors and, if it was walking, its legs' chordotonal and hair
+plate neurons, which changes nothing measurable, and the wings' own
 sensors (`wingbeat`) feed each stroke back to the flight motor neurons too
 weakly to keep them going: beating at full power they bring `wings` to about
 0.3. After an escape seen through the eyes `wings` peaks at 0.3 to 0.5, short of

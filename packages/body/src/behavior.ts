@@ -58,13 +58,15 @@ export const ESCAPE_REFRACTORY = 1.5;
  * beating and keeps them going until the feet touch something again (Fraenkel
  * 1932; a fly held by its back in the air flies for as long as its feet find
  * nothing to hold). The model has nothing that does it: leaving the ground
- * silences only the legs' 13 load sensors (`grounded`), which changes nothing
- * measurable, and the wings' own strain sensors (`wingbeat`, FlyBody.wingbeat)
- * feed each stroke back to the flight power motor neurons too weakly to keep
- * them going (at full power they give `wings` about 0.3). After an escape seen
- * through the eyes `wings` peaks at 0.3 to 0.5, below the 0.6 that holds the
- * fly up, and falls away (packages/brain/README.md). So the body keeps a floor
- * under the wings' drive while it is off its feet:
+ * silences the legs' 13 load sensors (`grounded`) and, in a fly that was
+ * walking, its legs' chordotonal and hair plate neurons (`legsLeft`,
+ * `legsRight`), which changes nothing measurable (packages/brain/README.md,
+ * The legs' proprioceptors), and the wings' own strain sensors (`wingbeat`,
+ * FlyBody.wingbeat) feed each stroke back to the flight power motor neurons
+ * too weakly to keep them going (at full power they give `wings` about 0.3).
+ * After an escape seen through the eyes `wings` peaks at 0.3 to 0.5, below the
+ * 0.6 that holds the fly up, and falls away (packages/brain/README.md). So the
+ * body keeps a floor under the wings' drive while it is off its feet:
  *
  * - A take-off goes straight into it: the giant fiber drives the jump muscle
  *   (TTM) and, through the PSI, the wings' power muscles, so the first

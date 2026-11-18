@@ -39,7 +39,7 @@ for (const seed of [1, 2, 3]) {
     return { mean, peak };
   }
 
-  const FULL: { [K in ScalarSense]: BrainSenses[K] } = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 };
+  const FULL: { [K in ScalarSense]: BrainSenses[K] } = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1, legsLeft: 1, legsRight: 1 };
   const conditions: { name: string; run: () => Float64Array }[] = [];
   for (const key of Object.keys(FULL) as ScalarSense[]) {
     conditions.push({
