@@ -472,15 +472,10 @@ bright side. The input stage codes contrast, a change against the facet's
 recent mean (`packages/brain/README.md`, Seeing): a steady light, once
 adapted to, drives nothing. What it does drive comes as brightening and
 motion while the fly moves, and none of it moves DNa02 toward the light's
-side. The fly's phototaxis
-rests on what the model leaves out: colour, the eyes' light being what R1–R6
-alone catch with ultraviolet left out (The eyes, above), where the fly's
-phototaxis is strongest to ultraviolet, through the inner photoreceptors R7
-and R8 and their medulla targets Dm8 and Tm5 (Gao et al. 2008, Neuron 60:328;
-Karuppudurai et al. 2014, Neuron 81:603); and lasting levels of light (L1's
-sustained component). Whether the fly can go
-to a light waits on those, on the brain's side, and is worth measuring again
-with this script when they come.
+side. Two things the model leaves out could carry a steady light: colour,
+through the inner photoreceptors R7 and R8, and lasting levels of light,
+through L1's sustained component. Both were tried (What would carry it,
+below), and neither makes the fly go to the light.
 
 Brightening has one answer the fly shouldn't give: it takes the fly off,
 through LC4 (`packages/brain/README.md`, Seeing). The panel did it in 7 of
@@ -499,6 +494,113 @@ node scripts/phototaxis.ts --summarise /tmp/phototaxis-dusk.json /tmp/phototaxis
 
 Each run takes a heavy slot as the scorecard does (`/tmp/flies-heavy`) and
 costs about 0.19 s of CPU per simulated second on an M5 Pro, about 37 s a run.
+
+### What would carry it
+
+**Which of the eye's cells can steer.** `packages/brain/scripts/routes.ts`
+drives one cell type in one eye at 50 Hz for 5 s on the running brain (eyes
+open on a steady grey scene, the background on) against a control of the same
+seed. Turn toward the driven eye, seeds 1 to 3, left eye then right:
+
+| Driven | Turn toward that eye | What else |
+| --- | --- | --- |
+| Mi1 (ON, L1's main partner) | +0.56, +0.46, +0.49; +0.52, +0.58, +0.44 | its own side's DNa02 up 14 to 20 Hz, every seed |
+| Tm3 (ON) | +0.09, −0.10, 0; −0.07, +0.24, 0 | stops walking (−0.13 to −0.35) |
+| Tm5a | +0.02, 0.00, 0; +0.11, +0.15, +0.06 | the right eye only |
+| Tm5b, Tm5c | −0.05 to +0.05 | nothing consistent |
+| Tm20 | +0.02, −0.10, −0.06; +0.11, +0.27, +0.15 | the right eye only; the left's walks |
+| MeTu (all types) | +0.16, +0.07, +0.06; −0.01, +0.08, 0 | the left eye only |
+| Dm8, L3, Tm9 | −0.03 to +0.05 | nothing |
+| R7, R8, firing | −0.02 to +0.02 | nothing anywhere: their histamine inhibits cells silent at rest |
+| R7, R8, withdrawing | −0.03 to +0.03 | Dm8, Dm9, MeTu and TuBu fire; nothing steers |
+
+Seed 3's DNa02s are silent in this scene, so it shows only what fires them
+outright.
+
+**Colour, through R7 and R8.** They are in the connectome: 608 R7 and 625 R8
+in the left eye, 777 and 704 in the right (R7p, R7y, R7d, R8p, R8y, R8d and
+untyped), of the 750 or so ommatidia an eye has, histaminergic by the
+operating point's fix (`packages/brain/README.md`), with their outputs onto
+Dm8, Dm9, Tm5a to c, Tm20, the MeTu cells that lead to the anterior optic
+tubercle, Mi1, Mi4, Mi15, L1 and L3. Nothing drives them. Light depolarises
+them and their histamine hyperpolarises their targets through the chloride
+channel Ort (Gao et al. 2008, Neuron 60:328), and Dm8 is inhibited by
+ultraviolet (Pagni et al. 2021, Curr. Biol. 31:1687). Driven that way, lit,
+they reach nothing: every target is silent at rest. Darkened (their release
+withdrawn, as L1's is), they reach Dm8, Dm9, MeTu and, beyond MeTu, the TuBu
+neurons of the anterior visual pathway to the central complex's compass, and
+none of it steers. The colour pathway's cells that do steer here (Tm5a, Tm20,
+MeTu, in one eye each) turn the fly toward the eye where they fire; light
+silences them in the fly, so through them the fly would, if anything, turn
+away from it. And the picture has no ultraviolet to give R7 (The eyes,
+above): driving it honestly needs a second, ultraviolet picture from the same
+render, with each material's ultraviolet an assumption. None of that would
+bring the fly to a light, so none of it was built.
+
+**Lasting light, through L1.** L1's response has a transient and a sustained
+component, and the sustained one codes luminance: in 10 s steps of light its
+calcium settles at a level that falls with luminance and doesn't decline
+(Ketkar et al. 2022, eLife 11:e74937, Figure 2A, E and F; the same paper's
+L3 holds its level through a 90 s staircase). The input stage leaves it out
+(`packages/brain/README.md`, Seeing). Mi1, which L1's withdrawals reach, is
+the strongest route to steering in the table above. So it was built as an
+experiment (branch `exp-l1-sustained-luminance`, `c3ac446`, TypeScript and
+C++ alike): L1's drive is its transient contrast plus 0.3 times the facet's
+light against its own level over 100 s, one depolarisation released above
+rest as spikes and below it as withdrawals. 0.3 is read from that figure:
+L1's plateau falls about 0.10 ΔF/F for each doubling of the light (Figure 2F,
+0.25 to 0.5 and 0.5 to 1 of the maximum), where its transient to a step
+up of that size is about 0.33 (Figure 2A, read from the mean trace, so
+roughly). 100 s was chosen, as ten
+times the steps over which the plateau held. Neither was set by what follows.
+
+Held still, with nothing to move the light across its eyes, the fly leans
+toward it (that branch's [lamp script](https://github.com/IsaacThoman/flies/blob/exp-l1-sustained-luminance/packages/brain/scripts/lamp.ts): a disc as bright as
+the screen goes, 18° in radius, 90° to one side on the horizon of the adapted
+dusk scene, about the panel at 30 mm, for 60 s, against an unlit control): the
+turn command toward it averages +0.033 ± 0.015 over the minute, toward it in
+12 of 12 pairs (seeds 1 to 6, both sides), about +0.1 in its first 3 s and
++0.02 to +0.04 by 30 to 60 s. The lean grows with the light (10 s, seeds 1,
+2 and 4, 60° to the side: 10° in radius +0.034, 20° +0.12, 40° +0.29, every
+pair toward). A turn of 0.03 is about 5° a second walking (`TURN_RATE`), and the
+background alone holds the turn command at ±0.2 for tens of seconds (the unlit
+controls of those 10 s, seeds 1, 2 and 4: +0.18, −0.19, +0.26).
+
+Free to walk, it doesn't go to the light. The same assay as above, on that
+branch, all trials, each cell the lit run less its unlit pair:
+
+| Light | Seeds | Pairs | Lamina, Hz (unlit: 0) | Turn toward it | Facing it | End distance, mm | Took off (unlit: never) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| bulb, dusk, 30 mm | 1 to 8 | 16 | 1.61 | +0.004 ± 0.008 (12) | +0.02 ± 0.20 (8) | +10 ± 50 (6 nearer) | 3 of 16 |
+| bulb, dusk, 30 mm | 9 to 16, held out | 16 | 1.82 | −0.005 ± 0.017 (8) | +0.14 ± 0.29 (10) | +13 ± 37 (5 nearer) | 6 of 16 |
+| panel, dusk, 30 mm | 1 to 8 | 16 | 4.98 | +0.002 ± 0.019 (8) | +0.04 ± 0.25 (8) | +10 ± 65 (5 nearer) | 4 of 16 |
+| panel, dusk, 30 mm | 9 to 16, held out | 16 | 5.32 | −0.007 ± 0.017 (5) | +0.12 ± 0.27 (10) | +14 ± 54 (8 nearer) | 8 of 16 |
+| bulb, night, 30 mm | 1 to 4 | 8 | 1.36 | +0.005 ± 0.009 (7) | +0.12 ± 0.20 (5) | −44 ± 59 (7 nearer) | 1 of 8 |
+| bulb, night, 10 mm | 1 to 8 | 16 | 2.66 | −0.005 ± 0.012 (5) | −0.04 ± 0.20 (6) | +19 ± 42 (4 nearer) | 3 of 16 |
+
+The turn command doesn't follow the light in any of them, and neither do
+heading and distance: the night bulb at 30 mm ended nearer in 7 of 8 pairs,
+and the same bulb at 10 mm ended further in 12 of 16. Seeds 9 to 16 were run
+only after the change and its two numbers were fixed.
+
+Turning toward the light moves it across the eyes, which the eyes answer as
+motion and brightening, and brings it into the front, where both eyes see it
+alike; looking away puts it in the blind zone behind. The lean is too small
+beside the background's turns to survive that. Nor is it free: with the panel
+in view the brain fires 1.5 to 2.8 times the spikes it does in the unlit scene,
+and 4 to 5 times with the 40° light (the lamp script), a lamina that has seen anything change keeps firing for
+minutes where a steady scene now costs nothing, and the escape command peaks higher
+(+0.15 with the panel, seeds 1 to 16), through Tm3 and LC4 as brightening
+does: the panel took the fly off in 12 of 32 runs. So the input
+stage keeps L1 transient, and the kit has no lamp: what the fly lacks is less
+a signal of steady light than a way for a weak, lasting bias to steer it
+against everything else that does.
+
+```sh
+# Which cells can steer: each type of the table, one eye at a time.
+node packages/brain/scripts/routes.ts --type Mi1
+node packages/brain/scripts/routes.ts --type /^R7/ --withdraw
+```
 
 <!-- docs-check: base apps/web/src -->
 
