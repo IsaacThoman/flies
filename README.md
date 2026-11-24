@@ -136,3 +136,10 @@ The wiring, and the shapes its nervous system is drawn with, are the
 Research Campus, CC-BY 4.0). The neuron model follows Shiu et al.,
 "A Drosophila computational brain model reveals sensorimotor processing",
 Nature 634 (2024).
+
+## Licence
+
+Flies is free software under the [GNU General Public License, version 3](LICENSE)
+or any later version. The third-party code and data it ships keep their own
+licences: [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES) and
+[licences and acknowledgements](docs/licenses.md).
