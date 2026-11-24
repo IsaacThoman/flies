@@ -2,7 +2,7 @@
 // it uses an indeterminate bead. The player may explore the world during both.
 
 import type { BrainDriver } from "@fly/contracts";
-import { INK, INK_SOFT, font, glassPanel, pill, roundedRect, text, wrap } from "@fly/ui";
+import { INK, INK_SOFT, font, pill, roundedRect, sheet, text, wrap } from "@fly/ui";
 import type { HitMap } from "@fly/ui";
 import { unmirrored } from "../brain/mirror.ts";
 import type { BrainFailure, BrainSource } from "../brain/worker-driver.ts";
@@ -39,7 +39,7 @@ export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: Brain
   }
   const { x, y, w, h } = layout.panel;
   const cx = x + w / 2;
-  glassPanel(g, x, y, w, h, 26);
+  sheet(g, x, y, w, h, 26);
   const running = brain.status === "running";
   const downloading = phase === "download";
   const title = running ? (loading?.source.storageFull ? "Awake · storage full" : "Awake") : downloading ? "Downloading brain" : "Waking brain";
@@ -99,7 +99,7 @@ export function drawFailure(g: CanvasRenderingContext2D, failure: BrainFailure |
   const { x, y, w } = layout.failure;
   const cx = x + w / 2;
   const [heading, line] = explain(failure, error, source);
-  glassPanel(g, x, y, w, layout.failure.h, 26);
+  sheet(g, x, y, w, layout.failure.h, 26);
   // Narrower than the TV's, the heading comes down a size to fit.
   g.font = font(22);
   const size = Math.min(22, Math.floor((22 * (w - 32)) / Math.max(1, g.measureText(heading).width)));

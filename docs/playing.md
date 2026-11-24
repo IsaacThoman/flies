@@ -55,7 +55,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Round the fly | Drag anywhere but with the feather, the air or the fingertip in hand on the table (they go where the finger goes); or drag with two fingers. On Why?, the same drag goes back and forth through it. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
 | Back to Follow | Double-tap the air. | Double-click the air, or R. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
-| Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
+| Menus | Tap a button, a tab, one of a setting's options, a switch's row, or the arrows of a setting too long to show its options; a list follows a drag. The round button at the top left, or a tap outside the pane, goes back. | The same, and the wheel scrolls a list; a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
 | The menu | The round button at the top left. | The same. |
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
@@ -372,7 +372,33 @@ or a bar it shows changes, at most four times a second.
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
 It has **Play**, **Watch** (the screensaver straight away), **Settings**,
-**Online** (where it can be), **Journal** and **About**.
+**Online** (where it can be), **Journal** and **About**: buttons standing
+over the world with no pane behind them, each with a picture of what it is,
+Play in green, and Online saying which room the fly is at while it is at one.
+
+Every screen the menu opens is laid out the same way
+(`apps/web/src/ui/menu-view.ts`, `apps/web/src/ui/screens/menu-screen.ts`).
+A button is a glossy pill; a row of a list (a setting, a room, a field to
+type in) is a flat plate, which turns white under the focus with the
+soap-bubble ring round it. A setting shows what it can be: its options side
+by side with the one chosen raised, or a switch for off and on; only where
+the options don't fit (the screensaver's six delays, a narrow phone) is it
+the one chosen between arrows, over a dot for each. Left and Right move along
+them, Select steps round them, and a finger or a mouse presses the one it
+wants. A list longer than its pane slides under it, a bar at its right
+showing how far down it is. Under the rows of Settings and of a new room, a
+line says what the focused row is for (with a mouse, the one under it; with
+a finger, the one last pressed); a pane too narrow or too short for the line
+does without. A screen arrives over a moment, fading in as it rises into
+place.
+
+Along the foot of the screen, hints say what the buttons in hand do with
+what has the focus (`apps/web/src/ui/hint-bar.ts`): Left and Right change a
+setting, Select presses a button or types into a field, Back goes back; on a
+screen too narrow for the words, the buttons alone. On the menu and what it
+opens they show on a first visit, until the first game; the Journal and About,
+whose buttons do more than move and choose, keep theirs. Settings → Picture →
+Hints turns them all off, and a pointer has none.
 
 ## Journal
 
@@ -423,7 +449,9 @@ companion, or a new fly, has none.
 ## Settings
 
 **Settings**: a row of tabs over each part of the game, every setting two
-steps from the menu, with rows scrolling on shorter screens: **Screensaver** (when it starts, how
+steps from the menu, with rows scrolling on shorter screens (a setting with
+nothing to act on is dimmed and passed over: what the stats show while there
+are no stats, the corners' size and opacity while nothing is in them): **Screensaver** (when it starts, how
 its camera films, where the flies live and whether the screensaver goes round
 the places, how many, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:

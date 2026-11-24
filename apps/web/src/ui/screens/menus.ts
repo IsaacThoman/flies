@@ -10,9 +10,16 @@
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
 // the menu button), with the fly living on behind it; Back there carries on
 // playing (on the Apple TV it leaves the app, as the root of an app must).
+// Its buttons stand over the world with no pane behind them, each with a
+// picture of what it is, and Play, what most came for, in green.
+//
+// A setting shows what it can be: its options side by side, a switch for off
+// and on, and under the rows a line on what the one in hand is for. One that
+// has nothing to act on (what the stats show, with the stats off) is dimmed
+// and passed over.
 
 import { Menu, choiceValue, indexOf } from "@fly/ui";
-import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
+import type { ActionItem, ChoiceItem, MenuItem, Option } from "@fly/ui";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
@@ -23,14 +30,15 @@ import { MenuScreen } from "./menu-screen.ts";
 import type { SettingsPage, Shell } from "./types.ts";
 
 export function titleScreen(shell: Shell) {
+  // With others, where there is a way to reach them.
+  const online: ActionItem | null = shell.canPlayOnline ? { kind: "action", id: "online", label: "Online", icon: "online" } : null;
   const menu = new Menu([
-    { kind: "action", id: "play", label: "Play" },
-    { kind: "action", id: "watch", label: "Watch" },
-    { kind: "action", id: "settings", label: "Settings" },
-    // With others, where there is a way to reach them.
-    ...(shell.canPlayOnline ? [{ kind: "action" as const, id: "online", label: "Online" }] : []),
-    { kind: "action", id: "journal", label: "Journal" },
-    { kind: "action", id: "about", label: "About" },
+    { kind: "action", id: "play", label: "Play", icon: "play", primary: true },
+    { kind: "action", id: "watch", label: "Watch", icon: "watch" },
+    { kind: "action", id: "settings", label: "Settings", icon: "settings" },
+    ...(online ? [online] : []),
+    { kind: "action", id: "journal", label: "Journal", icon: "journal" },
+    { kind: "action", id: "about", label: "About", icon: "about" },
   ], { wrap: true });
   // Laid out with the menu, for the backdrop to draw from.
   let title = titleLayout(shell.shape, menu.items.length);
@@ -38,6 +46,14 @@ export function titleScreen(shell: Shell) {
     id: "title",
     menu,
     root: true,
+    bare: true,
+    // At a room, Online says which.
+    onUpdate() {
+      const room = (shell.table?.joined && shell.table.name) || undefined;
+      if (!online || online.hint === room) return false;
+      online.hint = room;
+      return true;
+    },
     place: (frame) => (title = titleLayout(frame, menu.items.length)).menu,
     onActivate(item) {
       if (item.id === "play") shell.play();
@@ -108,7 +124,9 @@ const ON_OFF: Option<boolean>[] = [
   { value: true, label: "On" },
 ];
 
-const choice = <K extends keyof Settings>(id: K, label: string, options: Option<Settings[K]>[]): ChoiceItem<Settings[K]> => ({ kind: "choice", id, label, options, index: 0 });
+const choice = <K extends keyof Settings>(id: K, label: string, detail: string, options: Option<Settings[K]>[]): ChoiceItem<Settings[K]> => ({ kind: "choice", id, label, detail, options, index: 0 });
+/** Off or on: a switch. */
+const onOff = <K extends keyof Settings>(id: K & { [P in keyof Settings]: Settings[P] extends boolean ? P : never }[keyof Settings], label: string, detail: string): ChoiceItem<boolean> => ({ kind: "choice", id, label, detail, options: ON_OFF, index: 0, toggle: true });
 
 /**
  * The settings, a page for each part of the game, every one a step from the
@@ -118,35 +136,40 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
   wallpaper: {
     heading: "Screensaver",
     rows: (shell) => [
-      choice("wallpaperAfter", "Starts after", WALLPAPER_DELAYS),
-      choice("wallpaperCamera", "Camera", CAMERA),
+      choice("wallpaperAfter", "Starts after", "How long with no press before the screensaver", WALLPAPER_DELAYS),
+      choice("wallpaperCamera", "Camera", "How the screensaver films the fly", CAMERA),
       // Only when there is somewhere else to live: its home, and whether the screensaver goes round the others.
-      ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE), choice("wallpaperPlaces", "Places", TOUR)] : []),
+      ...(PLACES.length > 1 ? [choice("place", "Where it lives", "The fly's home", PLACE), choice("wallpaperPlaces", "Places", "Whether the screensaver goes round the places", TOUR)] : []),
       // How many flies live here; only where this device can run more than one brain.
-      ...(shell.maxFlies > 1 ? [choice("flies", "Flies", flyCounts(shell.maxFlies))] : []),
+      ...(shell.maxFlies > 1 ? [choice("flies", "Flies", "Each fly has a brain of its own", flyCounts(shell.maxFlies))] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
-      ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
+      ...(shell.weatherOutside ? [onOff("realWeather", "Real weather", "The weather and daylight outside, where you are")] : []),
       // How its day goes: livelier than a fly's, or as a fly's.
-      choice("pace", "Activity", PACE),
+      choice("pace", "Activity", "Natural is a real fly's day, with a long siesta", PACE),
     ],
   },
   // Everything that can show over the world: each picture in a corner, the stats and the fly seen through, each off, in the screensaver, or always; then how the corners' pictures look.
   screen: {
     heading: "On screen",
     rows: () => [
-      choice("eyesInset", "Fly POV", SHOWN),
-      choice("nerves", "Nervous system", SHOWN),
-      choice("statsPanel", "Stats", SHOWN),
-      choice("statsKind", "Stats content", STATS),
-      choice("overlaySize", "Overlay size", SIZE),
-      choice("overlayOpacity", "Overlay opacity", OPACITY),
-      choice("xray", "X-ray", SHOWN),
+      choice("eyesInset", "Fly POV", "What its eyes see, in a corner", SHOWN),
+      choice("nerves", "Nervous system", "Its brain and nerve cord at work, in a corner", SHOWN),
+      choice("statsPanel", "Stats", "Numbers from its brain and its day, in a corner", SHOWN),
+      choice("statsKind", "Stats content", "Which numbers the stats show", STATS),
+      choice("overlaySize", "Overlay size", "How big the pictures in the corners are", SIZE),
+      choice("overlayOpacity", "Overlay opacity", "How solid the pictures in the corners are", OPACITY),
+      choice("xray", "X-ray", "The fly as glass, its nervous system inside", SHOWN),
     ],
   },
   picture: {
     heading: "Picture",
-    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "Vision detail", EYES), choice("hints", "Hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
-
+    rows: () => [
+      choice("pixels", "Pixels", "Bigger pixels are less work to draw", PIXELS),
+      choice("eyes", "Vision detail", "How finely, and how often, its eyes see the world", EYES),
+      onOff("hints", "Hints", "What the buttons do, until each has been used"),
+      onOff("rumble", "Rumble", "Feel it in a game pad or a phone"),
+      onOff("stats", "Frame stats", "Draws, triangles and time for each frame"),
+    ],
   },
 };
 
@@ -160,6 +183,15 @@ export function settingsScreen(shell: Shell) {
   const menu = new Menu([tabs, ...pages[ids[0]]], { wrap: true });
   // Room for the longest page, so the pane keeps its size from tab to tab.
   const most = 1 + Math.max(...ids.map((id) => pages[id].length));
+  // A setting with nothing to act on is dimmed and passed over: what the stats show with no stats, how the corners' pictures look with none.
+  const dependents = () => {
+    const s = shell.settings;
+    const corners = s.eyesInset !== "off" || s.nerves !== "off" || s.statsPanel !== "off";
+    for (const item of pages.screen) {
+      if (item.id === "statsKind") item.disabled = s.statsPanel === "off";
+      else if (item.id === "overlaySize" || item.id === "overlayOpacity") item.disabled = !corners;
+    }
+  };
   // As they are now: the Place tool, or a script, may have changed them since.
   const show = () => {
     for (const item of menu.items) {
@@ -167,13 +199,14 @@ export function settingsScreen(shell: Shell) {
       if (item.kind === "choice") item.index = indexOf(item.options, settings[item.id]);
       else if (item.kind === "slider") item.value = settings[item.id] as number;
     }
+    dependents();
   };
   return new MenuScreen(shell, {
     id: "settings",
     heading: "Settings",
     trimEmpty: true,
     menu,
-    place: (frame) => fitMenu(menuSpace(frame), { items: most, width: 540, row: frame.design.height >= 440 ? 44 : 36, heading: true, foot: 28, values: true, raise: 14 }),
+    place: (frame) => fitMenu(menuSpace(frame), { items: most, width: 540, row: frame.design.height >= 440 ? 44 : 36, heading: true, foot: 28, values: true, raise: 14, detail: true }),
     onEnter: show,
     onChange(item) {
       if (item === tabs) {
@@ -182,6 +215,7 @@ export function settingsScreen(shell: Shell) {
         return;
       }
       settings[item.id] = item.kind === "slider" ? item.value : choiceValue(item);
+      dependents();
       shell.applySettings();
     },
     onBack: () => shell.back(),
