@@ -3,10 +3,9 @@
 // Chromium.
 //
 // With fingers, on a phone held upright with a notch and a home indicator:
-// the menus are tapped, the tools picked from the shelf and their kinds from
-// the label's arrows, honey is dropped by tapping the table in front of the
-// fly and reaches its taste senses and feed command, the feather strokes it while a finger is held
-// on it, a puff blows while a finger is held by it, a pinch brings the camera
+// the menus are tapped, tools are picked from the tray, and honey dropped
+// at the fly reaches its taste senses and feed command. The empty hand and
+// feather stroke it, a still press offers the fingertip, a pinch brings the camera
 // in and takes it out, a drag across the air turns it and it stays where it
 // was put, the phone is turned on its side
 // without the world being built again, a tap wakes the wallpaper and does
@@ -16,9 +15,9 @@
 // and shows no ring, and the first arrow shows it; the hand is under the
 // cursor, a click drops food there, the wheel brings the camera smoothly in
 // and out, a drag from the table, a right-drag and a middle-drag turn it and
-// it stays where it was put, a double click in the air or R takes it back to Follow, a trackpad's pinch zooms, the
-// number keys pick tools and + held zooms, and a nudge of the desk doesn't
-// wake the wallpaper while a mouse moved as if meant does.
+// it stays where it was put, and a double click in the air or R resets the
+// distance. Tab opens the tray. The controls fade and return with a mouse
+// move. The empty hand can pick up and drag a built piece.
 //
 //   node apps/web/e2e/pointer.e2e.ts [--url http://localhost:5173/]
 
@@ -29,7 +28,8 @@ import { Fingers, canvasPoint, doubleClick, openGame, readState, screenOf, start
 
 import type { Game } from "../src/game.ts";
 import { FLY_MIDDLE, FLY_REACH } from "../src/tools/aim.ts";
-import { FEATHER_REACH, TOOLS } from "../src/tools/hands.ts";
+import { FEATHER_REACH } from "../src/tools/hands.ts";
+import { chooseFromTray, waitForTray } from "./tray.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
@@ -51,6 +51,8 @@ let failed = false;
 
 /** The game's own object in the page, for reading what isn't on the canvas's data-*. */
 const game = <T>(page: Page, js: string) => page.evaluate(`(() => { const g = globalThis.__fly; return ${js}; })()`) as Promise<T>;
+
+const newestFood = (page: Page) => game<number>(page, "Math.max(0, ...g.life.pantry.foods.filter(f => f.kind !== 'patch' && f.kind !== 'found').map(f => f.id))");
 
 /** Turns the camera round to the fly's side, as a drag would, and waits for it to get there. */
 async function sideOn(page: Page) {
@@ -96,12 +98,13 @@ async function withAir(page: Page, gesture: (sky: [number, number]) => Promise<v
 }
 
 /** A table point must stay on the table while the brain walks the fly and input events arrive. */
-async function withTableCamera(page: Page, gesture: () => Promise<void>) {
-  await game(page, `(() => {
-    const p = g.life.world.place.start;
+async function withTableCamera(page: Page, gesture: () => Promise<void>, center?: { x: number; z: number; y?: number }) {
+  await page.evaluate((center) => {
+    const g = (globalThis as unknown as { __fly: Game }).__fly;
+    const p = center ?? g.life.world.place.start;
     const y = p.y ?? 0;
     g.director.pinned = { eye: { x: p.x, y: y + 30, z: p.z }, target: { x: p.x, y, z: p.z - 0.1 } };
-  })()`);
+  }, center);
   try {
     await waitForGameTime(page, 0.1);
     await gesture();
@@ -184,32 +187,25 @@ async function fingers() {
   const cost = budget(page);
   const touch = await Fingers.on(page);
   const tapOn = async (kind: string, index?: number) => touch.tap(await targetOf(page, kind, index));
-  const tools = await game<string[]>(page, "[...Array(16).keys()].map((i) => { const h = g.hands; const at = h.tool; h.tool = i; const id = h.current?.id; h.tool = at; return id; }).filter(Boolean)");
-  const tool = async (id: string) => {
-    await tapOn("tool", tools.indexOf(id));
-    await waitFor(page, `tool=${id}`);
-  };
+  const choose = (path: readonly string[]) => chooseFromTray(page, path, tapOn);
   try {
     step("fingers: the brain wakes, the title is tapped");
     const awake = await waitFor(page, "brain=running,screen=title", 90_000);
     assert.equal(awake.device, "touch");
     assert.equal(awake.frame, "376x815", "the phone's shape, square pixels, the TV's number of them");
     await tapOn("row", 0);
-    await waitFor(page, "screen=play,stack=title>play");
+    await waitFor(page, "screen=play,stack=title>play,tool=hand");
 
-    step("fingers: clear weather and midday, picked from the shelf and the arrows of the Sky's two labels");
-    await tool("sky");
-    await touch.tap(await targetOf(page, "kind", 1, 1));
+    step("fingers: clear weather and midday, picked from the tray");
+    await choose(["world", "weather", "clear"]);
     await waitFor(page, "sky=clock/clear,weather=clear");
-    await touch.tap(await targetOf(page, "kind", 1, 0));
-    await touch.tap(await targetOf(page, "kind", 1, 0));
+    await choose(["world", "time", "noon"]);
     await waitFor(page, "sky=noon/clear,time=noon");
     await waitForGameTime(page, 3);
     await waitWithin(page, "mode~standing|walking", 60);
 
     step("fingers: honey, dropped by tapping in front of the fly, reaches taste senses and produces a feed command");
-    await tool("feed");
-    await tapOn("kind", 1);
+    await choose(["food", "honey"]);
     await waitFor(page, "variant=honey");
     // The camera stays where it was put however the fly turns, so, as a player would, turn it to the fly's side first, where the spot in front of its mouth is in sight.
     await feedHoney(page, () =>
@@ -220,28 +216,36 @@ async function fingers() {
     );
 
     step("fingers: Clear dropped removes offerings without taking the place's food");
-    // Along the kinds, one tap and one shown change at a time, to the last.
-    for (let i = 0; i < 12; i++) {
-      const at = (await readState(page)).variant;
-      if (at === "clear") break;
-      await tapOn("kind", 1);
-      await waitFor(page, `variant~^(?!${at}$)`);
-    }
-    await waitFor(page, "variant=clear");
     const placeFoods = await game<number>(page, "g.life.pantry.foods.filter(f => f.kind === 'patch' || f.kind === 'found').length");
-    await withTableCamera(page, async () => {
-      const clearAt = await tableAway(page);
-      assert.ok(clearAt, "table clear of the controls to clear dropped food");
-      await touch.tap(clearAt);
-      await page.waitForFunction(() => {
-        const g = (globalThis as unknown as { __fly: Game }).__fly;
-        return g.hands.falling.length === 0 && !g.life.pantry.foods.some(f => f.kind !== "patch" && f.kind !== "found");
-      });
+    await choose(["world", "clearFood"]);
+    await page.waitForFunction(() => {
+      const g = (globalThis as unknown as { __fly: Game }).__fly;
+      return g.hands.falling.length === 0 && !g.life.pantry.foods.some(f => f.kind !== "patch" && f.kind !== "found");
     });
     assert.equal(await game<number>(page, "g.life.pantry.foods.length"), placeFoods);
 
+    step("fingers: putting the food away frees the hand, and a still press on the table offers the fingertip");
+    await tapOn("putAway");
+    await waitFor(page, "tool=hand");
+    await withTableCamera(page, async () => {
+      const spot = await tableAway(page);
+      assert.ok(spot, "open table away from the fly");
+      await touch.tap(spot);
+      await waitForGameTime(page, 0.2);
+      assert.equal((await readState(page)).tool, "hand");
+      await touch.hold(spot, () => waitFor(page, "tool=finger,finger=down", 5_000));
+      await waitForGameTime(page, 0.2);
+      assert.equal((await readState(page)).finger, "down", "lifting the screen contact leaves the fingertip down");
+      await waitFor(page, "fingerHeight=0.00");
+    });
+    await tapOn("putAway");
+    await waitFor(page, "tool=hand,finger=away");
+
+    step("fingers: the empty hand strokes the fly when held on it");
+    await touch.hold(await screenOf(page, "fly"), () => waitFor(page, "tool=hand,touch>0.05"));
+
     step("fingers: a finger held on the fly strokes it with the feather, on its back");
-    await tool("feather");
+    await choose(["toys", "feather"]);
     // The feather rests on whatever of the fly is under the hand, and a touch is still felt for a moment after
     // it has gone (packages/body's senses): left following the fly, in front of its mouth, the feather is on its
     // face, and its face still feels it on the frames after the finger lands on its back. So, as a player who
@@ -257,7 +261,7 @@ async function fingers() {
     });
 
     step("fingers: a finger held beside it blows");
-    await tool("blow");
+    await choose(["toys", "gentle"]);
     await touch.hold(await screenOf(page, "fly"), () => waitFor(page, "wind>0.05"));
 
     step("fingers: a pinch brings the camera in, smoothly and as far as the fingers go, and takes it out");
@@ -318,12 +322,11 @@ async function fingers() {
     });
     await waitFor(page, "frame=816x376");
     assert.equal(await game<string>(page, "g.stage.set.group.userData.mark"), "still here");
-    await tool("feed");
+    await choose(["food", "sugar"]);
 
     step("fingers: rotating during a held world press cancels the obsolete release");
     await waitForGameTime(page, 0.5);
-    const newestFood = () => game<number>(page, "Math.max(0, ...g.life.pantry.foods.filter(f => f.kind !== 'patch' && f.kind !== 'found').map(f => f.id))");
-    const foodBeforeRotation = await newestFood();
+    const foodBeforeRotation = await newestFood(page);
     await touch.hold(await screenOf(page, "fly"), async () => {
       await page.setViewportSize({ width: 393, height: 852 });
       await page.evaluate(() => {
@@ -333,7 +336,7 @@ async function fingers() {
       await waitFor(page, "frame=376x815");
     });
     await waitForGameTime(page, 0.5);
-    assert.equal(await newestFood(), foodBeforeRotation, "the rotated release dropped no food");
+    assert.equal(await newestFood(page), foodBeforeRotation, "the rotated release dropped no food");
     assert.equal(await game<boolean>(page, "g.director.held"), false, "the camera is released too");
 
     step("fingers: the wallpaper comes, and a tap brings the controls back and does nothing else");
@@ -392,6 +395,9 @@ async function mouse() {
     const world = await canvasPoint(page, [0.2, 0.8]);
     await page.mouse.click(world.x, world.y);
     await waitFor(page, "screen=play");
+
+    await chooseFromTray(page, ["food", "sugar"], click);
+    await waitFor(page, "tool=feed");
 
     step("mouse: the hand is under the cursor, and the system's cursor is hidden over the table");
     await withTableCamera(page, async () => {
@@ -492,12 +498,85 @@ async function mouse() {
     assert.equal((await readState(page)).food, foodBeforeDoubleClick, "a double click in the air drops nothing");
     await waitWithin(page, `view=follow,reach~^11\\.1$,yaw=${before}`, 15);
 
-    step("keys: a number picks a tool, and the hints are a keyboard's");
-    // The key for the feather is its place on the shelf, which grows as tools are added.
-    await page.keyboard.press(String(TOOLS.findIndex((t) => t.id === "feather") + 1));
+    step("keys: Tab opens the tray, and Escape puts away what was taken");
+    await page.keyboard.press("Tab");
+    await waitForTray(page, "root", 1);
+    await page.keyboard.press("Escape");
+    await waitForTray(page, null);
+    await chooseFromTray(page, ["toys", "feather"]);
     await waitFor(page, "tool=feather,device=keys");
-    await page.keyboard.press("1");
+    await page.keyboard.press("Escape");
+    await waitFor(page, "tool=hand,screen=play");
+
+    step("mouse: the controls fade while watching and a move brings them back");
+    await game(page, "(g.settings.wallpaperAfter = 0)");
+    await moveTo(0.47, 0.48);
+    await waitFor(page, "device=mouse");
+    await targetOf(page, "held");
+    await targetOf(page, "menu");
+    await waitForGameTime(page, 4);
+    await page.waitForFunction(() => {
+      const { overlay } = (globalThis as unknown as { __fly: Game }).__fly;
+      return Array.from({ length: overlay.hits.count }, (_, i) => overlay.hits.get(i)?.kind).every((kind) => kind !== "held" && kind !== "menu");
+    });
+    await moveTo(0.73, 0.42);
+    await chooseFromTray(page, ["food", "sugar"], click);
     await waitFor(page, "tool=feed");
+    await withTableCamera(page, async () => {
+      await click("held");
+      await waitForTray(page, "root");
+      const spot = await tableAway(page);
+      assert.ok(spot, "a world point outside the tray");
+      const point = await canvasPoint(page, spot);
+      const foodBeforeOutside = await newestFood(page);
+      await page.mouse.click(point.x, point.y);
+      await waitForTray(page, null);
+      await waitForGameTime(page, 1);
+      assert.ok(await newestFood(page) <= foodBeforeOutside, "clicking outside the tray spends the click");
+      await waitFor(page, "tool=feed");
+    });
+
+    step("mouse: turn a piece, set it down, then take it up with the empty hand and drag it somewhere else");
+    const beforeBuild = Number((await readState(page)).reach);
+    await chooseFromTray(page, ["build", "tile-blue"], click);
+    await waitFor(page, `tool=build,reach>${beforeBuild + 5}`);
+    const turns = await game<number>(page, "g.builder.turns");
+    await click("rotate");
+    await page.waitForFunction((turns) => (globalThis as unknown as { __fly: Game }).__fly.builder.turns === (turns + 1) % 8, turns);
+    await withTableCamera(page, async () => {
+      const from: [number, number] = [0.34, 0.5];
+      await moveTo(...from);
+      await waitFor(page, "buildAim~^tile-blue ok");
+      const at = await canvasPoint(page, from);
+      await page.mouse.click(at.x, at.y);
+      await waitFor(page, "built=1");
+      await click("putAway");
+      await waitFor(page, `tool=hand,reach<${beforeBuild + 0.5}`);
+      const piece = () => game<{ x: number; z: number; turns: number }>(page, "g.builder.pieces[0]");
+      const before = await piece();
+      // The piece snaps to the build grid, so grab its actual center.
+      const center = await page.evaluate((): [number, number] => {
+        const { builder, director } = (globalThis as unknown as { __fly: Game }).__fly;
+        const { x, y, z } = builder.pieces[0];
+        const p = director.camera.position.clone().set(x, y + 0.5, z).project(director.camera);
+        return [(p.x + 1) / 2, (1 - p.y) / 2];
+      });
+      const grab = await canvasPoint(page, center);
+      const end = await canvasPoint(page, [0.66, 0.5]);
+      await page.mouse.move(grab.x, grab.y);
+      await page.mouse.down();
+      try {
+        await waitFor(page, "tool=build,variant=tile-blue,built=0");
+        await page.mouse.move(end.x, end.y, { steps: 10 });
+        await waitFor(page, "buildAim~^tile-blue ok");
+      } finally {
+        await page.mouse.up();
+      }
+      await waitFor(page, "tool=hand,built=1");
+      const after = await piece();
+      assert.ok(Math.hypot(after.x - before.x, after.z - before.z) > 2, "the piece was set down somewhere else");
+      assert.equal(after.turns, (turns + 1) % 8, "the piece kept its orientation while carried");
+    }, { x: -40, z: -180 });
 
     step("mouse: in the wallpaper a nudge of the desk changes nothing; a mouse moved as if meant brings the controls back");
     await moveTo(0.5, 0.5, 4);

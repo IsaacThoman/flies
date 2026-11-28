@@ -15,7 +15,7 @@ import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
 import type { WeatherKind } from "../scene/weather.ts";
 
-export type ToolId = "feed" | "finger" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place" | "photo";
+export type ToolId = "hand" | "feed" | "finger" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place" | "photo";
 
 export type Variant = { id: string; label: string };
 
@@ -58,14 +58,16 @@ const WEATHERS: readonly Variant[] = [{ id: "now", label: "Now" }, { id: "clear"
  * and what the shelf keeps follow from the list.
  */
 export const TOOLS: readonly Tool[] = [
-  { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "coffee", label: "Coffee" }, { id: "laced", label: "Bitter sugar" }, { id: "clear", label: "Clear dropped" }] },
+  // The empty hand: held on the fly it strokes it, as the feather does; on a piece built it picks it up (game.ts).
+  { id: "hand", name: "Hand", verb: "Stroke", hold: true, variants: [{ id: "hand", label: "Hand" }] },
+  { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "coffee", label: "Coffee" }, { id: "laced", label: "Bitter sugar" }] },
   // A fingertip in the fly's world (tools/finger.ts): Select puts it down on the table or lifts it.
   { id: "finger", name: "Finger", verb: "Put down or lift", hold: false, variants: [{ id: "fingertip", label: "Fingertip" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
-  // The kit's pieces (packages/world/src/kit.ts), then what can be done to those already down.
-  { id: "build", name: "Build", verb: "Place", hold: false, world: true, variants: [...BUILD_PIECES, { id: "turn", label: "Turn" }, { id: "remove", label: "Take away" }, { id: "clear", label: "Clear built" }] },
+  // The kit's pieces (packages/world/src/kit.ts). Those already down are picked up by the empty hand, turned in hand, and put away with it.
+  { id: "build", name: "Build", verb: "Place", hold: false, world: true, variants: BUILD_PIECES },
   // The time of day, and the weather. "Now" follows the clock, so the wallpaper's light changes with the day outside; the weather's
   // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
   { id: "sky", name: "Sky", verb: "", hold: false, world: true, variants: LIGHTS, second: WEATHERS },
@@ -85,7 +87,10 @@ export const TOOLS: readonly Tool[] = [
  * doesn't know a newer tool reads its code as past its own last tool, which
  * acts on no fly.
  */
-const WIRE: readonly ToolId[] = ["feed", "swoop", "feather", "blow", "sky", "sky", "view", "place", "finger", "build", "photo"];
+const WIRE: readonly ToolId[] = ["feed", "swoop", "feather", "blow", "sky", "sky", "view", "place", "finger", "build", "photo", "hand"];
+
+/** A tool's place on the shelf, by its id, or -1. */
+export const toolIndex = (id: ToolId) => TOOLS.findIndex((t) => t.id === id);
 
 /** A tool's code on the wire, from its place on the shelf. */
 export const toolToWire = (index: number) => WIRE.indexOf(TOOLS[index].id);
@@ -98,6 +103,7 @@ export const WORLD_TOOLS = Math.max(0, TOOLS.findIndex((t) => t.world));
 /** Where the Place tool is on the shelf, or -1 without one. */
 export const PLACE_TOOL = TOOLS.findIndex((t) => t.id === "place");
 const SKY_TOOL = TOOLS.findIndex((t) => t.id === "sky");
+const FEATHER_TOOL = TOOLS.findIndex((t) => t.id === "feather");
 const VIEW_TOOL = TOOLS.findIndex((t) => t.id === "view");
 
 /** A tool's kinds on one of its dials. */
@@ -386,11 +392,7 @@ export class Hands {
 
     const tool = this.current.id;
     if (input.use) {
-      if (tool === "feed") {
-        if (this.variant.id === "clear") {
-          if (pantry.clearDropped()) this.falling.length = 0;
-        } else this.#drop(this.variant.id as FoodKind);
-      }
+      if (tool === "feed") this.#drop(this.variant.id as FoodKind);
       else if (tool === "swoop") this.#swoop(fly.yaw);
     }
 
@@ -457,17 +459,42 @@ export class Hands {
       air.y += this.puffDirection.y * felt;
       air.z += this.puffDirection.z * felt;
     }
-    if (this.current.id !== "feather" || !fly.onFeet) return 0;
+    if (!this.#feathered || !fly.onFeet) return 0;
     const d = Math.hypot(this.pointer.x - p.x, this.pointer.y - p.y, this.pointer.z - p.z);
     return d < FEATHER_REACH ? (this.#holding ? 1 : FEATHER_REST) : 0;
   }
 
   /** The feather on a fly, after `update`, where it touches it: added to `contacts` as `reach` says how hard. */
   touch(fly: { readonly position: Vec3; readonly onFeet: boolean }, contacts: Contacts) {
-    if (this.current.id !== "feather" || !fly.onFeet) return;
+    if (!this.#feathered || !fly.onFeet) return;
     const p = fly.position;
     if (Math.hypot(this.pointer.x - p.x, this.pointer.y - p.y, this.pointer.z - p.z) >= FEATHER_REACH) return;
     contacts.add(this.pointer.x, p.y + FLY_HEIGHT, this.pointer.z, FEATHER_TIP + (this.#holding ? FEATHER_BRUSH : 0), this.#holding ? 1 : FEATHER_REST);
+  }
+
+  /**
+   * The feather is in hand: taken up, or the empty hand held down, which
+   * strokes with it. The empty hand only touches while it is held, so a hand
+   * waiting by the fly's mouth never rests on it.
+   */
+  get #feathered() {
+    const id = this.current.id;
+    return id === "feather" || (id === "hand" && this.#holding);
+  }
+
+  /** The empty hand held down: it is stroking with the feather, drawn and sent as the feather. */
+  get petting() {
+    return this.current.id === "hand" && this.#holding;
+  }
+
+  /** The tool as the view draws it and the table hears of it: the empty hand stroking is the feather, which every device knows. */
+  get shownTool(): number {
+    return this.petting ? FEATHER_TOOL : this.tool;
+  }
+
+  /** Takes away the food the player dropped, falling or down, leaving the place's own (at a table, as the room allows). */
+  clearDropped(pantry: Pantry) {
+    if (pantry.clearDropped()) this.falling.length = 0;
   }
 
   /** Clears the per-frame events the screen has read. */

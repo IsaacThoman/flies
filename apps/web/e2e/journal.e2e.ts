@@ -9,6 +9,7 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import type { ChildProcess } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -16,7 +17,6 @@ import { parseArgs } from "node:util";
 import type { Page } from "playwright";
 import { gameUp, openGame, readState, startServer, stopServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
-import { TOOLS } from "../src/tools/hands.ts";
 import { dropFood } from "./feeding.ts";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, shots: { type: "string" } } });
@@ -68,6 +68,7 @@ try {
   assert.ok(await journalHas(page, /place:picnic\+/, 30), `no picture of its first visit: ${await journal(page)}`);
 
   step("a first meal: sugar dropped at its mouth until its brain chooses to eat, kept with a picture of it eating");
+  await chooseFromTray(page, ["food", "sugar"]);
   await waitFor(page, "tool=feed,variant=sugar");
   let ate = false;
   for (let drop = 1; drop <= 8 && !ate; drop++) {
@@ -87,15 +88,16 @@ try {
   await shot(page, "first-meal-play");
 
   step("the Photo tool: Select takes the world as the camera shows it, without the HUD");
-  // The number keys pick a tool, 1 the first and 0 the tenth.
-  await page.keyboard.press(`Digit${(TOOLS.findIndex((t) => t.id === "photo") + 1) % 10}`);
+  await chooseFromTray(page, ["photo"]);
   await waitFor(page, "tool=photo");
-  await page.keyboard.press("ArrowUp");
+  await chooseFromTray(page, ["look", "close"]);
   await waitForGameTime(page, 1);
   await page.keyboard.press("Enter");
   assert.ok(await journalHas(page, /photo\+/, 10), `no photo: ${await journal(page)}`);
 
   step("the journal from the menu: newest first, the pictures drawn, one opened big");
+  await page.keyboard.press("Escape");
+  await waitFor(page, "screen=play,tool=hand");
   await page.keyboard.press("Escape");
   await waitFor(page, "screen=title");
   await toRow(page, "journal");

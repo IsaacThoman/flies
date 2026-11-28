@@ -31,10 +31,15 @@ function cameraTarget(director: CameraDirector): PlayTarget {
     // The upper third is air; the rest is the table.
     aim: (_x, y) => y > 1 / 3,
     unaim: () => {},
+    under: () => "world",
     use: () => {},
+    grab: () => false,
+    offerFinger: () => {},
+    putAway: () => {},
     pressHud: () => {},
-    stepKind: () => {},
-    stepTool: () => {},
+    trayOpen: () => false,
+    closeTray: () => {},
+    hoverHud: () => {},
     turn: (yaw, pitch) => director.turnBy(yaw, pitch),
     zoom: (factor) => director.zoomBy(factor),
     holdCamera: (held) => {
@@ -84,7 +89,7 @@ test("a drag of so many pixels turns the camera by exactly that much times one r
       const body = fakeBody(place, x, z, yaw, y);
       director.setView(view);
       settle(director, body, 2);
-      const controls = new PlayControls(() => ({ width: 854, height: 480 }));
+      const controls = new PlayControls();
       const target = cameraTarget(director);
       for (let k = 0; k < 2; k++) {
         const before = { yaw: director.yaw, pitch: director.pitch };
@@ -165,7 +170,7 @@ test("zooming changes only the distance: the same way round, the same field of v
   settle(director, body, 1);
   const looked = forward(director);
   const fov = director.camera.fov;
-  const controls = new PlayControls(() => ({ width: 854, height: 480 }));
+  const controls = new PlayControls();
   const target = cameraTarget(director);
   let size = lengthOnScreen(director.camera, body);
   let last = director.camera.position.clone();
@@ -241,7 +246,7 @@ test("a double click in the air, R or the pad's stick pressed in goes back to Fo
   director.zoomBy(3);
   settle(director, body, 1);
   const yaw = director.yaw;
-  const controls = new PlayControls(() => ({ width: 854, height: 480 }));
+  const controls = new PlayControls();
   const target = cameraTarget(director);
   for (const g of [{ type: "down", x: 0.5, y: 0.1, button: 0, touch: false }, { type: "up", x: 0.5, y: 0.1, tap: true, double: false }, { type: "down", x: 0.5, y: 0.1, button: 0, touch: false }, { type: "up", x: 0.5, y: 0.1, tap: true, double: true }] as Gesture[]) controls.gesture(g, target, true);
   settle(director, body, 2);
@@ -256,7 +261,7 @@ test("every way of turning and zooming reaches the same rig: a mouse, a finger, 
   const run = (gestures: Gesture[], mouse: boolean) => {
     const director = new CameraDirector(world, 16 / 9, picnic.camera);
     settle(director, body, 1);
-    const controls = new PlayControls(() => ({ width: 854, height: 480 }));
+    const controls = new PlayControls();
     const before = { yaw: director.yaw, pitch: director.pitch, reach: director.reach };
     for (const g of gestures) controls.gesture(g, cameraTarget(director), mouse);
     settle(director, body, 1);

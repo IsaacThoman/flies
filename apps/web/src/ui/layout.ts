@@ -5,8 +5,6 @@
 
 import { TV_FRAME } from "../display.ts";
 import type { Frame } from "../display.ts";
-import { TOOLS } from "../tools/hands.ts";
-import type { Tool } from "../tools/hands.ts";
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -24,25 +22,23 @@ export type HudLayout = {
   /** The middle of the safe area, across, and its width. */
   cx: number;
   width: number;
-  /** Touch layouts keep portrait Menu in thumb range and a short screen's label beside its shelf. */
-  touch: { labelCx: number; labelY: number; labelWidth: number; menuY: number; menuAtFoot: boolean; targetHeight: number } | null;
   /** The caption's middle, down. */
   captionY: number;
-  /** The shelf: its lowest row's middle, down; the space each tool has; how big the orbs are (1 on the TV); where the first slot starts; the first tool of its second half, and how far that half is apart along the row (0 when the halves are one over the other, or together). */
-  shelfY: number;
-  gap: number;
-  orb: number;
-  shelfLeft: number;
-  split: number;
-  apart: number;
-  /** Each tool's middle, in the shelf's order. */
-  toolX: number[];
-  toolY: number[];
-  /** The glass under each half (one, when the halves are together), and all of it. */
-  groups: Rect[];
-  shelf: Rect;
-  /** The tool's label: its middle, down. */
+  /** The button at the foot showing what is in hand, which opens the tray: its middle and radius. */
+  heldX: number;
+  heldY: number;
+  heldR: number;
+  /** The buttons either side of it (turning a piece in hand, putting the hand's thing away): how far their middles are from its middle, and their radius. */
+  sideGap: number;
+  sideR: number;
+  /** The top of what is along the foot, and its left edge: the corner pictures keep above it where they would meet it. */
   labelY: number;
+  footLeft: number;
+  /** The tray's ring: its middle, and the most its slots' middles may reach up and down (`ringRoom`) and across (`ringWide`). */
+  ringX: number;
+  ringY: number;
+  ringRoom: number;
+  ringWide: number;
   /** Whether input hints need space beside the corner panels. */
   reserveHints: boolean;
   /** The hints: the left column's left edge and its lowest chip's middle; the right one's right edge and middle. */
@@ -50,7 +46,7 @@ export type HudLayout = {
   hintsY: number;
   rightX: number;
   rightY: number;
-  /** The menu's button (or, for the remote, its hint): its left edge and middle. */
+  /** The menu's button: its left edge and middle (at the foot, in a thumb's reach, on a touch screen). */
   menuX: number;
   menuY: number;
   /** The picture through the fly's eyes: the panel, the scale of its dots (design units per radian of azimuth), the room over them for saying what it is, and how it says it: as on the TV, in two lines on a narrow screen, small on a short one. */
@@ -63,18 +59,6 @@ export type HudLayout = {
   statsY: number;
 };
 
-/** The TV's shelf: the space each tool has, and how far apart its halves are (the tools that act on the fly, and those about its world and the camera); narrower, they come closer, then the tools do. */
-const SHELF_GAP = 52;
-const SHELF_APART = 32;
-const SHELF_APART_LEAST = 12;
-/** The widest the TV's shelf gets: its eight tools as they always were, clear of the pictures in the bottom corners. More come closer. */
-const SHELF_MOST = 8 * SHELF_GAP + SHELF_APART;
-/** Narrower than this a slot (design units, about 42 CSS pixels on a phone), a finger can't tell the tools apart: the halves go one over the other, the fly's over its world's. */
-const STACK_UNDER = 34;
-/** Where the fly's row starts at the least, beside the menu's button, when the halves are one over the other (design units from the safe area's left). */
-const MENU_CLEAR = 60;
-/** Rows of the shelf, middle to middle, when its halves are one over the other: its glass and a little between. */
-const SHELF_ROW = 58;
 /**
  * The picture through the fly's eyes, as the TV has it: the share of the
  * width its panel takes, its top and bottom as shares of the height, the
@@ -83,69 +67,31 @@ const SHELF_ROW = 58;
  * elevation.
  */
 const PICTURE = { width: 0.84, top: 0.11, foot: 0.73, sides: 0.04, heading: 57.6, under: 24, stretch: (0.76 * 427) / (0.45 * 480), wrapsUnder: 480 };
+/** The held thing's button and those beside it, design units on the TV; a finger needs them at least 56 and 44 CSS pixels across. */
+const HELD_R = 24;
+const SIDE_R = 17;
 
-/** `shelf`: the tools, for a layout of a shelf other than today's. */
-export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pick<Tool, "world">[] = TOOLS): HudLayout {
-  const tools = shelf.length;
-  const split = Math.max(0, shelf.findIndex((t) => t.world));
-  const halves = split > 0 && split < tools;
+export function hudLayout(frame: Frame, reserveHints = true): HudLayout {
   const a = safeRect(frame);
   const cx = a.x + a.w / 2;
   const bottom = a.y + a.h;
-  const compact = frame.coarse && a.h < 360 && a.w > a.h * 1.4 && a.w * frame.unit >= 700;
-  const touchApart = Math.min(SHELF_APART, a.w - 16 - tools * (44 / frame.unit));
-  let apart = frame.coarse ? (a.w > a.h * 1.2 && frame.unit > 1.25 ? Math.max(SHELF_APART, a.w - 16 - tools * SHELF_GAP) : touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : halves ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
-  if (!halves) apart = 0;
-  const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : frame.coarse ? SHELF_GAP : Math.min(SHELF_GAP, Math.floor((SHELF_MOST - apart) / tools));
-  let gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
-  // Too many for one row a finger can use: the fly's tools over its world's, each row as wide as it needs.
-  const stacked = halves && !compact && gap < STACK_UNDER;
-  if (stacked) {
-    apart = 0;
-    // As wide as the wider row allows, and the fly's row, beside the menu's button, no wider than the room right of it.
-    gap = Math.min(SHELF_GAP, (a.w - 16) / Math.max(split, tools - split), (a.w - 8 - MENU_CLEAR) / split);
-  }
-  const shelfY = bottom - 34;
-  const topRow = stacked ? shelfY - SHELF_ROW : shelfY;
-  const labelY = topRow - 61;
-  const shelfWidth = stacked ? gap * Math.max(split, tools - split) : gap * tools + apart;
-  const shelfLeft = compact ? a.x + 8 : cx - shelfWidth / 2;
-  const toolX: number[] = [];
-  const toolY: number[] = [];
-  const groups: Rect[] = [];
-  const group = (from: number, to: number, left: number, y: number) => {
-    for (let i = from; i < to; i++) {
-      toolX.push(left + (i - from + 0.5) * gap);
-      toolY.push(y);
-    }
-    groups.push({ x: left - 8, y: y - 26, w: (to - from) * gap + 16, h: 52 });
-  };
-  if (stacked) {
-    // The menu's button is beside the fly's row, in reach of a thumb: the row keeps clear of it.
-    group(0, split, Math.min(a.x + a.w - 8 - split * gap, Math.max(cx - (split * gap) / 2, a.x + MENU_CLEAR)), topRow);
-    group(split, tools, cx - ((tools - split) * gap) / 2, shelfY);
-  } else if (apart > 0) {
-    group(0, split, shelfLeft, shelfY);
-    group(split, tools, shelfLeft + split * gap + apart, shelfY);
-  } else group(0, tools, shelfLeft, shelfY);
-  const shelfRect = { x: Math.min(...groups.map((r) => r.x)), y: topRow - 26, w: 0, h: shelfY - topRow + 52 };
-  shelfRect.w = Math.max(...groups.map((r) => r.x + r.w)) - shelfRect.x;
-  const menuAtFoot = frame.coarse;
-  const menuBeside = menuAtFoot && !stacked && a.w * frame.unit >= 375;
-  const touch = frame.coarse ? {
-    labelCx: compact ? (shelfLeft + shelfWidth + 16 + a.x + a.w - 8) / 2 : cx + (menuBeside ? 28 : 0),
-    labelWidth: compact ? a.x + a.w - 8 - (shelfLeft + shelfWidth + 16) : a.w - 16 - (menuBeside ? 56 : 0),
-    labelY: compact ? shelfY : labelY,
-    menuY: compact ? shelfY - 52 : stacked ? topRow : labelY - (menuBeside ? 0 : 45),
-    menuAtFoot,
-    targetHeight: Math.max(32, 44 / frame.unit),
-  } : null;
-  // The hints keep to the corners beside the shelf (the lowest, "Tools", is beside it), unless the shelf reaches them: then above the label.
-  const beside = shelfRect.x > a.x + 16 + 100;
-  const hintsY = beside ? shelfY : labelY - 36;
-  // The picture between the caption and the label: as big as fits, keeping the dots' proportions.
+  const heldR = frame.coarse ? Math.max(HELD_R, 28 / frame.unit) : HELD_R;
+  const sideR = frame.coarse ? Math.max(SIDE_R, 22 / frame.unit) : SIDE_R;
+  const heldY = bottom - heldR - 10;
+  const sideGap = heldR + sideR + 12;
+  // Over it, the name of what is in hand, for a moment when it is taken up.
+  const labelY = heldY - heldR - 32;
+  // A finger's menu is at the foot, in the bottom left corner; a mouse's in the top left, as windows have it.
+  const menuX = a.x + 16;
+  const menuY = frame.coarse ? heldY : a.y + 24;
+  const footLeft = frame.coarse ? menuX - 6 : cx - sideGap - sideR - 8;
+  const hintsY = heldY;
+  // The ring in the middle of the room over the foot, where the fly is, its slots' middles as far out as leaves them room.
+  const ringY = (a.y + labelY) / 2;
+  const ringRoom = Math.max(60, Math.min(a.w / 2 - 36, (labelY - a.y) / 2 - 30));
+  // The picture between the caption and the foot: as big as fits, keeping the dots' proportions.
   const top = Math.max(a.y + a.h * PICTURE.top, a.y + 25 + 23);
-  const room = { w: a.w * PICTURE.width, h: Math.min(a.y + a.h * PICTURE.foot, labelY - 17 - 12) - top };
+  const room = { w: a.w * PICTURE.width, h: Math.min(a.y + a.h * PICTURE.foot, labelY - 12) - top };
   const sides = a.w * PICTURE.sides;
   // Narrow, what it is says it in two lines; short, in small type.
   const pictureText = room.h < 220 ? "small" : room.w < PICTURE.wrapsUnder ? "wrapped" : "full";
@@ -157,26 +103,25 @@ export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pic
   return {
     cx,
     width: a.w,
-    touch,
     captionY: a.y + 25,
-    shelfY,
-    gap,
-    orb: Math.min(1, (gap / 2 - 1) / 22),
-    shelfLeft,
-    split: apart > 0 || stacked ? split : tools,
-    apart,
-    toolX,
-    toolY,
-    groups,
-    shelf: shelfRect,
+    heldX: cx,
+    heldY,
+    heldR,
+    sideGap,
+    sideR,
     labelY,
+    footLeft,
+    ringX: cx,
+    ringY,
+    ringRoom,
+    ringWide: Math.max(ringRoom, a.w / 2 - 36),
     reserveHints,
     hintsX: a.x + 16,
     hintsY,
     rightX: a.x + a.w - 16,
     rightY: hintsY,
-    menuX: a.x + 16,
-    menuY: a.y + 24,
+    menuX,
+    menuY,
     picture: { x: cx - pw / 2, y: top + (room.h - ph) / 2, w: pw, h: ph },
     pictureScale: scale,
     pictureHeading: heading,
@@ -423,10 +368,10 @@ export function loadingLayout(frame: Frame): LoadingLayout {
   return { wordmark, panel, failure, retry, fly };
 }
 
-/** The room the HUD leaves the fly while playing, between the caption and the tool's label: its share of the height, and where the fly's middle falls in it (a share of the half-height below the middle), about two thirds of the way down. */
+/** The room the HUD leaves the fly while playing, between the caption and what is along the foot: its share of the height, and where the fly's middle falls in it (a share of the half-height below the middle), about two thirds of the way down. */
 function playSpot(frame: Frame, hud: HudLayout) {
   const top = hud.captionY + 15;
-  const bottom = hud.touch && hud.touch.labelY === hud.shelfY ? hud.shelfY - 26 : hud.labelY - 17;
+  const bottom = hud.labelY - 4;
   const half = frame.design.height / 2;
   return { share: (bottom - top) / frame.design.height, low: (top + 0.7 * (bottom - top) - half) / half };
 }
@@ -435,8 +380,8 @@ function playSpot(frame: Frame, hud: HudLayout) {
  * Where the fly goes while playing, against where the shots put it for the
  * TV's HUD: how much lower (a share of the half-height; negative is higher),
  * and how much wider the field of view (1 on the TV). On a short screen the
- * shelf and the label take more of the height, so the fly rises to stay clear
- * of them and is drawn a little smaller to fit the room left.
+ * foot takes more of the height, so the fly rises to stay clear of it and is
+ * drawn a little smaller to fit the room left.
  */
 export function playRoom(frame: Frame): { lower: number; wider: number } {
   const here = playSpot(frame, hudLayout(frame));

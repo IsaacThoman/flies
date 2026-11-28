@@ -122,6 +122,8 @@ export class Finger {
   readonly #on: (FlyBody | null)[] = new Array<FlyBody | null>(MAX_CARRIED).fill(null);
   readonly #surface = createSurface();
   #inHand = false;
+  /** Asked to be down before it has come in: it comes in down. */
+  #downOnArrival = false;
   /** The surface the hand was last on: the finger rests on nothing more than RISE_SPLIT over it (a jar beside it, not the jar's top far above). */
   #ground = 0;
 
@@ -153,10 +155,17 @@ export class Finger {
     this.down = !this.down;
   }
 
+  /** Down where the hand is, whether it is there yet or still to come in (the empty hand held still on the table). */
+  putDown() {
+    if (this.present) this.down = true;
+    else this.#downOnArrival = true;
+  }
+
   /** Gone at once, with nothing on it: the fly has been carried to another place. */
   clear() {
     this.present = false;
     this.down = false;
+    this.#downOnArrival = false;
     this.carried = 0;
     this.#on.fill(null);
     this.#world.movingPresent = false;
@@ -191,7 +200,8 @@ export class Finger {
       if (!inHand) return;
       // Coming in from above, pointing at the fly.
       this.present = true;
-      this.down = false;
+      this.down = this.#downOnArrival;
+      this.#downOnArrival = false;
       tip.x = pointer.x;
       tip.z = pointer.z;
       if (Math.hypot(tip.x - toward.x, tip.z - toward.z) > FINGER_HALF_WIDTH) this.yaw = Math.atan2(tip.x - toward.x, tip.z - toward.z);

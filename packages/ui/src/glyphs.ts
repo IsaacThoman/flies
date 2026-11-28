@@ -142,7 +142,7 @@ function remoteGlyph(g: Ctx, glyph: Glyph, x: number, y: number, size: number, t
 }
 
 /** What a keyboard's key says, for a glyph: the arrows are drawn, not written. */
-const KEY_LABELS: Partial<Record<Glyph, string>> = { select: "Enter", hold: "Enter", playPause: "Esc", back: "Esc" };
+const KEY_LABELS: Partial<Record<Glyph, string>> = { select: "Enter", hold: "Enter", playPause: "Space", back: "Esc" };
 
 /** A key: a rounded cap with a lip, `w` wide and `h` tall, centred on (x, y). */
 function keycap(g: Ctx, x: number, y: number, w: number, h: number) {

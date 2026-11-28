@@ -482,17 +482,15 @@ export class Pointers {
 
 /**
  * The keys a keyboard has that the remote hasn't (the arrows, Enter, Escape
- * and the space bar are the remote's): the number keys pick a tool, R or
- * Home takes the camera back to Follow's distance and height; held, Q and E
- * turn the camera round the fly, W and S up and down, and + and − bring it in
- * and take it out.
+ * and the space bar are the remote's): Tab opens and closes the tray, as the
+ * space bar does; R or Home takes the camera back to Follow's distance and
+ * height; held, Q and E turn the camera round the fly, W and S up and down,
+ * and + and − bring it in and take it out.
  */
-export type KeyAction = { kind: "tool"; index: number } | { kind: "home" };
+export type KeyAction = { kind: "tray" } | { kind: "home" };
 
 export function keyAction(code: string, key: string): KeyAction | null {
-  // 1 to 9 along the shelf, and 0 the tenth, as the keys lie.
-  const digit = /^(?:Digit|Numpad)([0-9])$/.exec(code);
-  if (digit) return { kind: "tool", index: (Number(digit[1]) + 9) % 10 };
+  if (code === "Tab") return { kind: "tray" };
   if (code === "KeyR" || key === "Home") return { kind: "home" };
   return null;
 }
@@ -519,11 +517,13 @@ export class Keyboard {
   tilt = 0;
   zoom = 0;
 
-  constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
+  /** `trayKey`: whether Tab is the tray's now (in play), rather than the browser's, which moves focus (the menus, and the page's own controls for a screen reader). */
+  constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now(), trayKey: () => boolean = () => true) {
     target.addEventListener("keydown", (event) => {
       const e = event as KeyboardEvent;
       if (e.ctrlKey || e.metaKey || e.altKey || (e.repeat && !this.#held.has(e.code))) return;
       const action = keyAction(e.code, e.key);
+      if (action?.kind === "tray" && !trayKey()) return;
       const axis = action ? null : keyAxis(e.code, e.key);
       if (!action && !axis) return;
       e.preventDefault?.();
@@ -570,17 +570,18 @@ export const STICK_DEAD = 0.22;
 const REPEAT_FIRST = 400;
 const REPEAT_EVERY = 100;
 
-/** The standard pad's buttons that are the remote's (the W3C standard mapping): A, B, Start, the d-pad. */
+/** The standard pad's buttons that are the remote's (the W3C standard mapping): A, B, Y and Start (the tray, as Play/Pause is), the d-pad. */
 const PAD_BUTTONS: readonly [number, RemoteButton][] = [
   [0, "select"],
   [1, "back"],
+  [3, "playPause"],
   [9, "playPause"],
   [12, "up"],
   [13, "down"],
   [14, "left"],
   [15, "right"],
 ];
-/** Its shoulder buttons step through the tools, as left and right do. */
+/** Its shoulder buttons are left and right too: round the fly, or a piece in hand turned. */
 const PAD_SHOULDERS: readonly [number, RemoteButton][] = [
   [4, "left"],
   [5, "right"],
@@ -591,8 +592,8 @@ type PadLike = { connected: boolean; mapping: string; buttons: readonly { presse
 /**
  * A game pad, through the web's Gamepad API: polled once a frame, and only
  * once one has been connected. Its buttons are the remote's (A is Select, B
- * is Back, Start is Play/Pause, the d-pad the arrows, the shoulders the
- * tools); the left stick moves the hand as a finger on the touch surface
+ * is Back, Y and Start are Play/Pause, the d-pad and the shoulders the
+ * arrows); the left stick moves the hand as a finger on the touch surface
  * does, or, in a menu, steps as the arrows do; the right stick turns the
  * camera round the fly, and pressed in takes it back to Follow; the
  * triggers bring it in (right) and take it out (left), as far as they are

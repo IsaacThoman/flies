@@ -213,14 +213,14 @@ test("a time of day and a weather chosen on the Light and Weather tools come bac
 
 test("what the hints have taught comes back, of the lessons this build has", () => {
   const store = memory();
-  saveLearned({ arrival: true, tools: true, hand: true, feed: true, feather: true }, store);
-  assert.deepEqual(loadLearned(store), { arrival: true, tools: true, hand: true, feed: true, feather: true });
+  saveLearned({ arrival: true, tray: true, camera: true, hand: true, feed: true, feather: true }, store);
+  assert.deepEqual(loadLearned(store), { arrival: true, hand: true, tray: true, camera: true, feed: true, feather: true });
   // The Sky is taught to one who hadn't used both of the tools it was before.
   assert.deepEqual(loadLearned(memory({ "flies.learned": JSON.stringify({ light: true, weather: true }) })), { sky: true });
   assert.deepEqual(loadLearned(memory({ "flies.learned": JSON.stringify({ light: true }) })), {});
-  // A tool since dropped, or a value that isn't a plain yes, is passed over.
+  // A tool or a lesson since dropped (going along the old shelf), or a value that isn't a plain yes, is passed over.
   const old = memory({ "flies.learned": JSON.stringify({ tools: true, lamp: true, swoop: 1, blow: "yes", place: true }) });
-  assert.deepEqual(loadLearned(old), { tools: true, place: true });
+  assert.deepEqual(loadLearned(old), { place: true });
   for (const raw of ["", "{", "null", '["tools"]', "true"]) assert.deepEqual(loadLearned(memory({ "flies.learned": raw })), {}, raw);
   assert.deepEqual(loadLearned(null), {});
 });
@@ -232,11 +232,11 @@ const kindOf = (hands: Hands, tool: string) => {
   return TOOLS[i].variants[hands.variants[i]].id;
 };
 
-test("the hands start on Feed with what was kept, by id, and on each tool's first kind otherwise", () => {
+test("the hands start empty, with what was kept, by id, and on each tool's first kind otherwise", () => {
   const fresh = new Hands(new World(bare));
   const hands = new Hands(new World(bare), { view: { kind: "table" }, light: { kind: "golden" }, weather: { kind: "overcast" } });
-  assert.equal(hands.current.id, "feed");
-  assert.equal(hands.variant.id, "sugar");
+  assert.equal(hands.current.id, "hand");
+  assert.equal(kindOf(hands, "feed"), "sugar");
   assert.equal(hands.view, "table");
   assert.equal(hands.timeOfDay, "golden");
   assert.equal(hands.weather, "overcast");

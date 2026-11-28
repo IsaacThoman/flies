@@ -185,10 +185,12 @@ export function statsLayout(frame: Frame, hud: HudLayout = hudLayout(frame), siz
   const others = nerves.across ? eyesWidth + GAP + nervesWidth : Math.max(eyesWidth, nervesWidth);
   // Where the column of pictures may reach at the top (under the caption unless there's room beside it) and at the bottom.
   const topFor = (width: number) => (a.w / 2 - 120 - margin - 8 >= width ? a.y + margin : hud.captionY + 23);
-  const floorFor = (width: number) => (hud.shelfLeft > a.x + margin + width ? a.y + a.h - margin : hud.labelY - 25);
+  const floorFor = (width: number) => (hud.footLeft > a.x + margin + width ? a.y + a.h - margin : hud.labelY - 25);
   // While playing it is at the top: clear of the menu's button on the left, and of the hints under each side.
   const reach = (left: boolean, width: number) => hud.reserveHints ? Math.min(floorFor(width), left ? hud.hintsY - 50 : hud.rightY - 20) : floorFor(width);
-  const topOf = (left: boolean, width: number) => Math.max(topFor(width), left ? hud.menuY + 26 : -Infinity);
+  // Clear of the menu's button where it is at the top (a finger's is at the foot).
+  const menuAtTop = hud.menuY < a.y + a.h / 2;
+  const topOf = (left: boolean, width: number) => Math.max(topFor(width), left && menuAtTop ? hud.menuY + 26 : -Infinity);
   // Under the others at the top, as they are when both show, and over them at the bottom.
   const columnTop = (left: boolean) => {
     const c: Corner = left ? "top-left" : "top-right";

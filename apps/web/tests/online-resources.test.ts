@@ -115,7 +115,7 @@ test("a room removal cancels a remote offering still falling so it cannot reappe
 
 test("online clears wait for the room: rejected falling food still lands; accepted falling food never returns", async () => {
   const { Online } = await import("../src/online/online.ts");
-  const { Hands } = await import("../src/tools/hands.ts");
+  const { Hands, TOOLS } = await import("../src/tools/hands.ts");
   const { Life } = await import("../src/life.ts");
   const { Company } = await import("../src/company.ts");
   const { Table } = await import("../../server/src/table.ts");
@@ -152,9 +152,10 @@ test("online clears wait for the room: rejected falling food still lands; accept
   update();
   update();
   assert.ok(online.joined);
+  hands.tool = TOOLS.findIndex((t) => t.id === "feed");
   const use = (kind: "sugar" | "clear") => {
-    hands.variants[0] = hands.current.variants.findIndex((v) => v.id === kind);
-    hands.update(0, { use: true, holding: true, eye: camera.position }, body, online.pantry);
+    if (kind === "clear") hands.clearDropped(online.pantry);
+    else hands.update(0, { use: true, holding: true, eye: camera.position }, body, online.pantry);
     update();
     hands.clearEvents();
   };

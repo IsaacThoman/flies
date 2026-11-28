@@ -36,7 +36,9 @@ if (!native) {
   const pointers = new Pointers(() => canvas.getBoundingClientRect(), undefined, devices);
   pointers.attach(canvas);
   inputs.pointers = pointers;
-  inputs.keyboard = new Keyboard(window, remote, devices);
+  // With the page's own controls for a screen reader, Tab is always the browser's, to move among them.
+  const semantic = accessibilityEnabled(location.search);
+  inputs.keyboard = new Keyboard(window, remote, devices, undefined, () => !semantic && game?.screen === "play");
   inputs.pads = new Gamepads(remote, devices, () => navigator.getGamepads?.() ?? [], window);
 }
 (window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY] = true;

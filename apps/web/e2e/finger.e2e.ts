@@ -30,6 +30,7 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import type { ChildProcess } from "node:child_process";
 import { openGame, readState, startServer, stopServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
@@ -53,21 +54,9 @@ type Drive = { x: number; z: number; speed: number; tx: number; tz: number } | n
 type Peak = { looming: number; loom: number; escape: number; watching: boolean; fast: number; looked: number; slide: number };
 type Hooked = { __fly: Game; __drive: Drive; __spot: { x: number; z: number; yaw: number }; __peak: Peak; __hold: boolean };
 
-/** Steps along the shelf to a tool. */
-const toTool = async (id: string) => {
-  for (let i = 0; i < 12; i++) {
-    const at = (await readState(page)).tool;
-    if (at === id) return;
-    await page.keyboard.press("ArrowRight");
-    await waitFor(page, `tool~^(?!${at}$)`);
-  }
-  await waitFor(page, `tool=${id}`);
-};
-const press = async (key: string, times = 1) => {
-  for (let i = 0; i < times; i++) {
-    await page.keyboard.press(key);
-    await waitForGameTime(page, 0.15);
-  }
+const press = async (key: string) => {
+  await page.keyboard.press(key);
+  await waitForGameTime(page, 0.15);
 };
 const state = async () => readState(page);
 const num = async (key: string) => Number((await state())[key]);
@@ -91,9 +80,11 @@ const drivenThere = () => page.waitForFunction(() => {
   return !d || (d.x === d.tx && d.z === d.tz);
 }, null, { polling: 50, timeout: 60_000 });
 const fingerDown = async (down: boolean) => {
-  if ((await state()).finger === (down ? "down" : "raised")) return;
+  const target = down ? "down" : "raised";
+  const ready = await waitFor(page, "tool=finger,finger~^(raised|down)$");
+  if (ready.finger === target) return;
   await press("Enter");
-  await waitFor(page, `finger=${down ? "down" : "raised"}`);
+  await waitFor(page, `finger=${target}`);
 };
 
 try {
@@ -103,11 +94,9 @@ try {
   await waitFor(page, "screen=play");
 
   step("midday and clear, so the finger is seen against a bright table and sky");
-  // The Sky: Select steps its weather, Up and Down its time of day.
-  await toTool("sky");
-  await press("Enter");
+  await chooseFromTray(page, ["world", "weather", "clear"]);
   await waitFor(page, "weather=clear");
-  await press("ArrowDown", 2);
+  await chooseFromTray(page, ["world", "time", "noon"]);
   await waitFor(page, "time=noon");
 
   // The hand, driven each frame through the game's own pointer, as a mouse or a swipe moves it: straight at the target at its speed.
@@ -193,7 +182,7 @@ try {
       return [...light.left, ...light.right];
     });
   };
-  await toTool("finger");
+  await chooseFromTray(page, ["finger"]);
   await waitFor(page, "finger=raised");
   await handTo(16, 0, Infinity);
   await setFly();
@@ -264,7 +253,7 @@ try {
     await setFly();
   };
   // For comparison, the ball (Swoop), thrown at it and watched the same way.
-  await toTool("swoop");
+  await chooseFromTray(page, ["toys", "ball"]);
   await setFly();
   await hold(true);
   await waitForGameTime(page, 4);
@@ -274,7 +263,7 @@ try {
   });
   console.log(`  the ball: looming detectors ${thrown.looming.toFixed(1)} Hz, escape ${thrown.escape.toFixed(2)}`);
   await setFly();
-  await toTool("finger");
+  await chooseFromTray(page, ["finger"]);
   // Straight ahead, where this brain's looming pathway is all but silent, and from its front right and its right side, where it is
   // strongest (packages/brain/README.md, Seeing).
   const TRIES = 3;

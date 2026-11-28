@@ -24,6 +24,7 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import type { ChildProcess } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -152,18 +153,7 @@ const hide = (page: Page, hidden: boolean) =>
     document.dispatchEvent(new Event("visibilitychange"));
   }, hidden);
 
-/** Steps along the shelf to a tool, one step at a time as the game shows each. */
-async function toTool(page: Page, id: string) {
-  for (let i = 0; i < 12; i++) {
-    const at = (await readState(page)).tool;
-    if (at === id) return;
-    await page.keyboard.press("ArrowRight");
-    await waitFor(page, `tool~^(?!${at}$)`, 2000);
-  }
-  await waitFor(page, `tool=${id}`, 1000);
-}
-
-/** Moves the focus with `key` until it is on `id`, one step at a time as the game shows each (a first arrow may only show where the focus is). */
+/** The first arrow may only show menu focus after pointer input. */
 async function keyTo(page: Page, id: string, key: "ArrowUp" | "ArrowDown") {
   for (let i = 0; i < 16; i++) {
     const at = (await readState(page)).focus;
@@ -254,7 +244,7 @@ try {
   step("they share the food: sugar the first drops is on both tables by its one name, and what is left of it agrees within a moment");
   await a.page.keyboard.press("Enter");
   await waitFor(a.page, "screen=play");
-  await toTool(a.page, "feed");
+  await chooseFromTray(a.page, ["food", "sugar"]);
   await waitFor(a.page, "variant=sugar");
   await a.page.keyboard.press("Enter");
   // The first food player 1 drops (DROP_ID × the player, plus its count).
@@ -514,12 +504,10 @@ try {
   await one.page.keyboard.press("Escape");
   await waitFor(one.page, "screen=title");
 
-  step("the Place tool goes to another place, and to that place's own room, its home left as it was: the other tab no longer sees it, until it follows from the list");
+  step("choosing a place from the tray goes there, and to that place's own room, its home left as it was: the other tab no longer sees it, until it follows from the list");
   await one.page.keyboard.press("Enter");
   await waitFor(one.page, "screen=play");
-  await toTool(one.page, "place");
-  await fly(one.page, `g.hands.variants[g.hands.tool] = g.hands.current.variants.findIndex((v) => v.id === '${to}')`);
-  await one.page.keyboard.press("Enter");
+  await chooseFromTray(one.page, ["world", "place", to]);
   const inLab = await waitFor(one.page, `online=joined,everyone=yes,roomName=${toName},place=${to},moving=`, 240_000);
   assert.equal(await fly(one.page, "g.online.code"), lab);
   assert.equal(await fly(one.page, "g.settings.visit"), seriesFor(to), "it visits there now");
@@ -543,7 +531,7 @@ try {
   assert.equal(await fly(one.page, "g.settings.visit"), -1, "kept for the next launch");
   await waitFor(one.page, "onlineView=rooms,focus=new");
   await waitFor(one.page, "place=picnic,moving=", 240_000);
-  await one.page.waitForTimeout(3000);
+  await waitForGameTime(one.page, 3);
   assert.equal((await readState(one.page)).table, "", "still alone");
   await one.page.reload();
   await gameUp(one.page);
@@ -605,7 +593,7 @@ try {
     await waitUntil(page, `${MAX_FLIES - 1} other flies there`, (s) => othersOf(s).filter((o) => o.present && !o.resting).length === MAX_FLIES - 1, 15_000);
     await page.keyboard.press("Enter");
     await waitFor(page, "screen=play");
-    await toTool(page, "view");
+    await chooseFromTray(page, ["look", "follow"]);
     await waitFor(page, "view=follow");
     for (const [name, shape] of Object.entries(SHAPES).filter(([, shape]) => shape.coarse === coarse)) {
       await page.setViewportSize({ width: shape.width, height: shape.height });
@@ -617,8 +605,8 @@ try {
       const frame = frameFor(shape.width, shape.height, shape.safe, shape.coarse);
       await waitFor(page, `frame=${frame.width}x${frame.height}`, 5000);
       const line: string[] = [];
-      for (const [view, key] of [["follow", ""], ["close", "ArrowUp"]] as const) {
-        if (key) await page.keyboard.press(key);
+      for (const view of ["follow", "close"]) {
+        if (view === "close") await chooseFromTray(page, ["look", view]);
         await waitFor(page, `view=${view}`, 3000);
         // The camera comes round to its new view.
         await waitForGameTime(page, 1.5);
@@ -633,7 +621,7 @@ try {
         assert.ok(cost.triangles < MAX_TRIANGLES, `${name}, ${view}: ${cost.triangles} triangles`);
       }
       console.log(`  ${name} (${frame.width}x${frame.height}): ${line.join("; ")}`);
-      await page.keyboard.press("ArrowDown");
+      await chooseFromTray(page, ["look", "follow"]);
       await waitFor(page, "view=follow", 3000);
     }
     // Gives its seat back for the next.

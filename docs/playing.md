@@ -24,21 +24,67 @@ Apple TV host that can run only one brain shows no Flies row.
 ## Controls
 
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
-as with the remote. Your hand is a glowing ring on the table; until you move
-it, it waits just in front of the fly's mouth, and it drifts back there 15 s
-after you last did. The ring answers the hand: dropping food, throwing the ball or starting Tickle or Blow presses it in
-and it springs back; holding Tickle or Blow keeps it in a little, and a press it
-can't act on (the ball still in the air, Up past the last kind) shakes it.
-Food that lands sets a faint ring spreading round it. None of this is in the
-fly's world; the fingertip ([Finger](#the-fingertip)) is.
+as with the remote, and the controls keep out of the way: while you only
+watch, nothing is drawn over the world but the corner pictures you have
+chosen. Reach for anything (a press, a touch, the mouse moved as if meant)
+and they come back; about 4 s after you last did anything they fade again.
+On a touch screen the button for the tray and the menu's stay, faint, so
+there is always something to reach for.
+
+Your hand is a glowing ring on the table; until you move it, it waits just in
+front of the fly's mouth, and it drifts back there 15 s after you last did.
+The ring answers the hand: dropping food, throwing the ball, setting a piece
+down or stroking the fly presses it in and it springs back; holding keeps it
+in a little, and a press it can't act on (the ball still in the air, a piece
+where it won't go) shakes it. Food that lands sets a faint ring spreading round
+it. None of this is in the fly's world; the feather, the fingertip, the food,
+the ball and the pieces are.
+
+**The hand does what makes sense for what is under it and what it holds**
+(`apps/web/src/controls.ts`, `apps/web/src/game.ts`). A launch starts with it
+empty. Empty, held on the fly it strokes it with the feather (drawn there
+while it does, and felt as the feather's full touch: [the
+senses](simulation.md#the-flys-senses)); it never rests on the fly while it
+only waits by it. Pressed on a piece you built, it takes it up; held still on
+the table, it puts your fingertip down there ([Finger](#the-fingertip)).
+Holding something, Select or a tap uses it where the hand is: food is dropped,
+the ball dives, a piece is set down (and stays in hand for the next, unless it
+was one taken up from where it stood, which leaves the hand empty again), the
+camera takes a picture. The feather and a puff are held where the hand is.
+
+**The tray** (`apps/web/src/tools/tray.ts`, drawn by `apps/web/src/ui/tray.ts`)
+is everything the hand can take up, out of sight until it is asked for: Play/Pause
+on the remote, the space bar or Tab, a pad's Y or Start, or the button at the
+foot of the screen, which shows what is in hand. It opens as a ring of
+bubbles round the middle of the screen (stretched across into an oval on a
+short, wide screen, so each bubble keeps a finger's size), two deep at most:
+
+| In the first ring | Is |
+| --- | --- |
+| Hand | The empty hand. |
+| Food | Sugar, honey, raspberry, water, coffee and bitter sugar (what a fly makes of each is in [the world](world.md#food)). |
+| Build | The kit's pieces ([below](#building)). |
+| Toys | The feather (resting on the fly is a light touch, held a full one), a breath and a puff of air (gently or hard, from where you sit toward the hand), and the ball (a dark beach ball dives at the spot and veers away). |
+| Finger | Your fingertip ([below](#the-fingertip)). |
+| Photo | The camera, for the fly's [journal](#journal). |
+| Look | The views: close up, follow, wide, the whole table, from above, through the fly's eyes, inside it (close up with the fly as glass) and [Why?](#why). Choosing one leaves the hand as it was. |
+| World | The time of day (now, which follows the clock, or morning, midday, golden hour, dusk, night), the weather (now, which follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm, snow, sleet), the place it lives, and clearing what you dropped or built. |
+
+What is in hand, or chosen, is marked pink; the remote's choice is lit, its
+name in the middle of the ring, where a tap goes back a ring. Taking anything
+closes it; a press anywhere outside it closes it and does nothing else. What
+can't be taken here (building on a visit, the sky and the place at a table)
+is dimmed. With a finger, each bubble's name is under it. Taken up, a
+thing's name shows over the button at the foot for a moment.
 
 | On the remote | Does |
 | --- | --- |
-| Swipe on the touch surface | Moves your hand across the table. With View or Photo in hand, turns the camera round the fly and up or down instead; on Why?, goes back and forth through what it plays. |
-| Left / Right | Picks a tool from the shelf. |
-| Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. With Photo in hand, brings the camera in and takes it out. |
-| Select | Uses the tool: drops food, throws the ball, puts the fingertip down or lifts it, sets a piece down, turns or takes one away, takes a photo. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
-| Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
+| Swipe on the touch surface | Moves your hand across the table. With the camera in hand, or Why? playing, turns the camera round the fly and up or down instead (on Why?, goes back and forth through it). With the tray open, lights what is that way round it. |
+| Select | Uses what is in hand; the empty hand takes up the piece it is on. Hold it to stroke, tickle or blow. |
+| Left / Right | Turns the camera an eighth of a turn round the fly; with a piece in hand, turns the piece. |
+| Up / Down | Brings the camera in, and takes it out. |
+| Play/Pause | Opens the tray, and closes it. |
+| Back | Out of the fly's eyes, inside it or Why?; then puts away what is in hand; then the menu. With the tray open, back a ring. |
 | Back on the menu | On Apple TV, leaves at the root. In the browser, returns to play after play has begun. |
 
 Pointing, the screen itself is what you press, and there are no button hints:
@@ -46,30 +92,33 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | | With a finger | With a mouse or trackpad |
 | --- | --- | --- |
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
-| Feed, Swoop, Build | Tap where you mean. | Click there. |
-| Photo | Tap the world, or the tool again. | Click the world, or the tool. |
-| Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
-| Finger | The fingertip goes where you touch, and a drag carries it; a tap puts it down or lifts it. | It follows the cursor; a click puts it down or lifts it, and a drag carries it. |
-| Sky, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too (on the Sky, its weather). The Sky has two labels side by side, the time of day and the weather, each with its own arrows (one over the other where they don't fit). Place has a Go button for somewhere the fly isn't. | The same, or the wheel over a label. |
+| Stroke the fly | Touch it with the hand empty and hold, and drag. | Hold the button on it. |
+| Move a piece | Press on it and drag; let go where it should go, or over the buttons at the foot to put it away. A tap takes it up into the hand. | The same with the button. |
+| Your fingertip | Touch the table with the hand empty and hold still. | Hold the button still on the table. |
+| Feed, the ball, a piece, Photo | Tap where you mean. | Click there. |
+| Feather, a puff | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
+| The tray | The button at the foot; tap a bubble. | The same; hovering over a bubble names it. |
+| Turn a piece in hand, put away what is in hand | The buttons either side of the one at the foot. | The same. |
 | Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
-| Round the fly | Drag anywhere but with the feather, the air or the fingertip in hand on the table (they go where the finger goes); or drag with two fingers. On Why?, the same drag goes back and forth through it. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
+| Round the fly | Drag anywhere but on the fly or a piece with the hand empty, or the feather, the air or the fingertip in hand on the table; or drag with two fingers. On Why?, the same drag goes back and forth through it. | Drag (the same), or drag with the right or middle button. A trackpad's two-finger scroll, round and up or down. |
 | Back to Follow | Double-tap the air. | Double-click the air, or R. |
-| Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
 | Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
-| The menu | The round button at the top left. | The same. |
+| The menu | The round button at the bottom left. | The round button at the top left. |
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
-Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
-tool (1 the first, 0 the tenth), + and − held bring the camera in and take it out, Q and E held turn it
-round the fly (on Why?, go back and forth through it), W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
+Back, the space bar for Play/Pause), its hints drawn as keys; in play Tab opens
+the tray too (elsewhere, and always with the page's controls for a screen
+reader, it moves the browser's focus as ever), + and − held bring the camera in and take it out, Q and E held turn
+it round the fly (on Why?, go back and forth through it), W and S up and down,
+and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was
 last pressed. A standard game pad (the Gamepad API) is the remote too: A is
-Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the
-arrows, the left stick moves your hand (and steps through a menu), the right
-stick turns the camera round and up (pressed in, back to Follow; on Why?,
-across goes back and forth through it), the triggers bring
-it in and take it out as far as they are pressed; its hints are drawn as its
-buttons. A pad that can
+Select, B Back, Y and Start Play/Pause, the d-pad and the shoulder buttons the
+arrows, the left stick moves your hand (and goes round the tray, and steps
+through a menu), the right stick turns the camera round and up (pressed in,
+back to Follow; on Why?, across goes back and forth through it), the triggers
+bring it in and take it out as far as they are pressed; its hints are drawn as
+its buttons. A pad that can
 rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
 dropped and a softer one when it lands, a swell as the ball dives, two quick
 knocks when a press can't do anything, light pulses while the feather is on
@@ -83,61 +132,40 @@ screensaver, using arrow, pointing or grabbing cursors elsewhere. It suppresses 
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are, about the fly, **Feed** (sugar, honey, raspberry, water, coffee, bitter sugar,
-and Clear dropped, which removes your offerings, including those still falling, leaving the
-place’s own food; what a fly makes of each is in [the world](world.md#food)), **Finger**
-(a fingertip in the fly's world, below), **Tickle** (a feather: resting on
-the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
-from where you sit toward the spot) and **Swoop** (a dark
-beach ball dives at the spot and veers away); and, about its world and the
-camera, **Build** (pieces of a kit set down in the place the fly lives,
-below), **Sky** (the time of day: now, which follows the clock, or morning,
-midday, golden hour, dusk, night, on Up and Down; and the weather: now, which
-follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm,
-snow, sleet, on Select, round and round), **Place** (where it lives; Up and
-Down choose, Select carries it there), **View** (close up, follow, wide, the whole table, from above,
-through the fly's eyes, inside it, close up with the fly as glass, and
-[Why?](#why), its last few seconds played back; Up brings the camera in, Down
-takes it out) and **Photo** (a picture of the world as the camera shows it, for
-the fly's [journal](#journal): with it in hand your hand is off the table,
-swipes and drags turn the camera, Up and Down bring it in and out, and Select
-takes the picture; the screen flashes white after the picture has been taken,
-so the flash, the hints and everything else drawn over the world are never in
-it). On the shelf the two groups stand
-apart, or, on a screen too narrow for them in a row, the fly's over its
-world's, with the menu's button beside the fly's row; Left and Right go along
-all of them. On the TV more than eight tools come closer together rather than
-reach the pictures in the bottom corners. Hints in the
-corners show what the buttons do, until they have been used: the shelf's goes
-once you have gone along it, and what Select does with a tool once you have
-used it (held it, for Tickle and Blow), on later launches too; the Sky's
-shows Up and Down over its time of day and Select over its weather. The way to the
-menu stays visible. With hints enabled, a remote or pad also teaches hand
-movement until that lesson is learned; it is kept between launches.
-Settings → Picture → Hints controls whether this teaching is shown. A caption at the top says what the fly is doing.
+Hints at the foot show the remote's, the keys' or the pad's buttons until they
+have been used, on later launches too: Play/Pause for the tray, the arrows for
+the camera, a swipe for the hand, and Select (or holding it) for each thing in
+hand. The tray's button shimmers until it has been opened, with a pointer too.
+Settings → Picture → Hints controls whether this teaching is shown. While the
+controls show, a caption at the top says what the fly is doing.
+
+### Building
 
 **Build** sets pieces of a kit down on the table, the sill or the bench
 where the fly lives: a blue and a yellow dish (food dropped into one lies in
 its well), blue, yellow and red tiles, a crumb, a twig, a leaf, a ramp and a
-wall. Up and Down pick the piece; a glassy ghost of it shows where Select
-will set it down, on a grid so that walls meet end to end into a maze or an
-arena, and turns red where it won't go (into something, off the edge, onto
+wall. Taking a piece up brings the camera out (to at least 70 mm and a little
+higher) so that something several times the fly's size can be seen where it
+goes, and putting it away takes the camera back. A glassy ghost of the piece
+shows where it will go, on a grid so that walls meet end to end into a maze or
+an arena, and turns red where it won't go (into something, off the edge, onto
 a slope, on the fly or on food). Waiting in front of the fly, the hand sets a
-piece down just beyond it, as near as it has room. Past the pieces in the
-list, Turn turns the piece under the hand an eighth of a turn (and the next
-pieces go down that way), Take away takes it away, and Clear built takes
-away everything built there. A place keeps up to 40 pieces, between launches
-too, each place its own. Building is for home: on a visit or at a table the
-tool says "Only at home", and the pieces are put away until the fly is home
-again ([online](online.md#who-owns-what)).
-The pieces are real to the fly: it stands on them, walks into them and sees
-them, and the camera keeps out of them ([the world](world.md#what-you-build)).
+piece down just beyond it, as near as it has room. Left and Right (or the
+button left of the one at the foot) turn the piece in hand an eighth of a turn,
+and the next pieces go down that way. With the hand empty, a piece under it
+glows: pressed (or Select), it is taken up into the hand, to go wherever it is
+set down next, or back in the kit when the hand is emptied. World → Clear
+built takes away everything built there. A place keeps up to 40 pieces,
+between launches too, each place its own. Building is for home: on a visit or
+at a table the kit is dimmed in the tray, and the pieces are put away until the
+fly is home again ([online](online.md#who-owns-what)). The pieces are real to
+the fly: it stands on them, walks into them and sees them, and the camera keeps
+out of them ([the world](world.md#what-you-build)).
 
-A launch starts on Feed with sugar, so that one press of Select gives the fly
-something to find. It comes back to the view last chosen (but never through
-the fly's eyes, which would open on no fly at all), and to a time of day or a
-weather chosen in the last six hours; after that it is back on Now, so the
-screensaver follows the clock again.
+A launch comes back to the view last chosen (but never through the fly's eyes,
+which would open on no fly at all), and to a time of day or a weather chosen in
+the last six hours; after that it is back on Now, so the screensaver follows
+the clock again.
 
 ## Why?
 
@@ -177,11 +205,10 @@ unmarked. That something rose first doesn't say it caused what followed:
 Why? shows what came before and what fired.
 
 It pauses nothing: the fly lives on behind the card, and its brain keeps
-running. Going through it is the camera's gesture: a swipe on the remote with
-View in hand, Q and E, a pad's right stick across, a drag with a mouse or a
+running. Going through it is the camera's gesture: a swipe on the remote, Q and E, a pad's right stick across, a drag with a mouse or a
 finger (to the right, later; a drag the screen's width is all of it); it
-holds where it is left for a moment and plays on. Up, Select, or another
-view leaves it at once. Coming back to it takes what is kept then. It is
+holds where it is left for a moment and plays on. Back, or another view,
+leaves it at once. Coming back to it takes what is kept then. It is
 never kept between launches. It is this device's own: nobody else at a table
 sees it, and it sends nothing.
 
@@ -280,7 +307,7 @@ while, not to find a better side. Where you leave it, it stays.
 The camera follows your orbit through scenery. A prop or wall can block the
 view of the fly as you turn or zoom past it.
 
-The View tool's views are places on the same orbit, reached over a moment.
+The views in the tray's Look are places on the same orbit, reached over a moment.
 Follow is nominally 11 mm out, low over the table. A historical TV-sized
 reference put the fly about 170 pixels long, Close up about twice that size
 and Wide about a third (capture date, machine and pose unknown); framing
@@ -288,7 +315,7 @@ depends on aspect. Whole table goes out
 to the whole place, to the side the screensaver films it from; From above
 looks down from behind the fly. Each sets only how far out and how far up
 (and those two, which way round); you can turn and zoom from there at once,
-and the View tool names the view you are nearest. R, a double click or tap in
+and Look marks the view you are nearest. R, a double click or tap in
 the air, or the pad's right stick pressed in takes an orbit view back to Follow's
 distance and height, on the same side of the fly. The screensaver takes the
 camera from the orbit and hands back smoothly from its current shot;
@@ -308,7 +335,7 @@ after the fly. Going into play eases from its shot into yours, and out again.
 ## Screensaver and displays
 
 After 30 seconds with no press (Settings → Screensaver: 15 s to 5 min, or never)
-the hints, the shelf and the pointer fade, and the camera settles beside the
+the controls and the pointer fade, and the camera settles beside the
 fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 The fly stays home, in the place it lives, unless Settings → Screensaver →
@@ -384,7 +411,7 @@ go through them; Down reaches its buttons. With a finger or a mouse, a tap
 opens one, a drag or the wheel scrolls, and the arrows either side go through
 them.
 
-Two kinds of picture are in it. The player's own, taken with the Photo tool,
+Two kinds of picture are in it. The player's own, taken with Photo from the tray,
 and the fly's firsts, each kept once in its life and pictured as it happens:
 its first flight (a second of its wings beating in the air), its first meal of
 each food, its first groom (half a second of it), the first time it walks

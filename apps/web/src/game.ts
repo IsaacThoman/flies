@@ -31,7 +31,7 @@ import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import { DRAG_ROUND, DRAG_UP, NOTCH_ZOOM, PlayControls } from "./controls.ts";
-import type { PlayTarget, ToolUse } from "./controls.ts";
+import type { PlayTarget, ToolUse, Under } from "./controls.ts";
 import { COLOURS, MAX_OWN, PROTOCOL, everyoneSeries, seriesFor, seriesPlace } from "@fly/net";
 import type { SeatedFly, TableStart } from "@fly/net";
 import { TouchLoupe } from "./ui/touch-loupe.ts";
@@ -76,8 +76,10 @@ import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
 import { Builder, buildAction } from "./tools/build.ts";
 import type { Aim } from "./tools/build.ts";
-import { DIALS, Hands, TOOLS } from "./tools/hands.ts";
+import { DIALS, FEATHER_REACH, Hands, PLACE_TOOL, TOOLS, toolIndex } from "./tools/hands.ts";
 import type { Dial, DialId, ToolId } from "./tools/hands.ts";
+import { Tray } from "./tools/tray.ts";
+import type { TrayItem } from "./tools/tray.ts";
 import { HandsView } from "./tools/view.ts";
 import { Finger } from "./tools/finger.ts";
 import { FingerView } from "./tools/finger-view.ts";
@@ -89,7 +91,7 @@ import type { Recorded } from "./why/recorder.ts";
 import { ReplayView } from "./why/replay.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
 import type { CornerPicture } from "./ui/corners.ts";
-import { HUD_HITS, SHUTTER_FLASH, drawHud, needsTeaching } from "./ui/hud.ts";
+import { HUD_HITS, SHUTTER_FLASH, drawHud, hudMoving, needsTeaching } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
@@ -113,7 +115,7 @@ const AWAKE_HOLD_NOTE = 4;
 const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
-/** With the View tool in hand, a swipe across the touch surface (2 units) turns the camera as far round as a drag across the screen, and one up it about as far up. */
+/** With the camera in hand, a swipe across the touch surface (2 units) turns the camera as far round as a drag across the screen, and one up it about as far up. */
 const SWIPE_ROUND = DRAG_ROUND / 2;
 const SWIPE_UP = DRAG_UP / 2;
 /** The refresh cap for animated teaching, loading status and frame stats, Hz. */
@@ -127,6 +129,17 @@ const QUIET_AFTER = 60;
 const CLOCK_EVERY = 2;
 /** Seconds of sustained tickling or blowing that distinguish a hold from a press. */
 const HOLD_TAUGHT = 0.5;
+/** Seconds after the player last did anything before the controls fade, leaving the world; and how fast they come and go (1/s). */
+const PRESENT_FOR = 4;
+const PRESENCE_IN = 10;
+const PRESENCE_OUT = 2.5;
+/** Left and Right turn the camera round the fly this far (radians): an eighth of a turn. */
+const ARROW_ROUND = Math.PI / 4;
+/** A swipe on the remote's touch surface this long (its units) picks the tray's thing that way. */
+const TRAY_SWIPE = 0.35;
+/** Taking up a piece, the camera comes out to at least this far (mm) and this high (radians), so a piece several times the fly's size can be seen where it goes; put away, it goes back. */
+const BUILD_REACH = 70;
+const BUILD_PITCH = 0.7;
 /** A pad's right stick at full tilt: radians a second round the fly, and up; and Q or E held, round, W or S, up. */
 const PAD_ROUND = 2.4;
 const PAD_UP = 1.2;
@@ -172,7 +185,7 @@ const isArrow = (button: RemoteButton) => button === "up" || button === "down" |
 
 /** How a tool is used on the table, by a pointer. */
 function toolUse(id: string): ToolUse {
-  return id === "feed" || id === "swoop" || id === "build" || id === "photo" ? "once" : id === "feather" || id === "blow" ? "hold" : id === "finger" ? "place" : "none";
+  return id === "hand" ? "hand" : id === "feed" || id === "swoop" || id === "build" || id === "photo" ? "once" : id === "feather" || id === "blow" ? "hold" : id === "finger" ? "place" : "none";
 }
 
 export class Game implements Shell {
@@ -283,10 +296,20 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { preview: -1, tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, touched: false, hints: false, eyes: false, taught: -1, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null, tray: -1, open: false };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
+  /** The tray: what the hand can take up, out of sight until asked for. */
+  readonly tray = new Tray();
+  /** How much the controls show: 1 while the player is at it, 0 once they only watch. */
+  #presence = 1;
+  /** The piece in hand was taken up from where it was built: set down, the hand is empty again. */
+  #carried = false;
+  /** Where the camera was before a piece was taken up, to go back to when it is put away. */
+  #beforeBuild: { distance: number; pitch: number } | null = null;
+  /** A swipe on the remote's surface with the tray open, so far. */
+  #traySwipe = { x: 0, y: 0 };
   #paddleIn = 0;
   #clockAt = 0;
   #air = new THREE.Vector3();
@@ -384,7 +407,7 @@ export class Game implements Shell {
     this.devices = inputs.devices;
     this.#inputs = inputs;
     this.haptics = new Haptics(this.devices, () => navigator.getGamepads?.() ?? [], typeof navigator.vibrate === "function" ? navigator.vibrate.bind(navigator) : null);
-    this.#controls = new PlayControls(() => this.shape.design);
+    this.#controls = new PlayControls();
     this.#target = this.#playTarget();
     this.settings = loadSettings();
     // Every launch is at home: a visit, or a room of its own, sits it down where that is once it can.
@@ -468,7 +491,28 @@ export class Game implements Shell {
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, shutter: Infinity, brainRunning: false, arrival: arrival(this.brain), eyes: null, layout: this.#hudLayout };
+    this.#hud = {
+      hands: this.hands,
+      tray: this.tray,
+      activity: "waiting",
+      food: null,
+      hints: true,
+      glyphs: this.glyphs,
+      learned: this.#learned,
+      teachSwipe: true,
+      presence: 1,
+      changed: 10,
+      shutter: Infinity,
+      brainRunning: false,
+      arrival: arrival(this.brain),
+      eyes: null,
+      layout: this.#hudLayout,
+      coarse: display.frame.coarse,
+      unit: display.frame.unit,
+      canBuild: true,
+      unavailable: (item) => this.#unavailable(item),
+      label: (item) => this.#trayLabel(item),
+    };
     // Nothing points on the Apple TV: nothing to record.
     this.overlay.hits.enabled = !!inputs.pointers;
     this.#applyFrame();
@@ -869,26 +913,64 @@ export class Game implements Shell {
     for (const f of this.hands.falling) f.floor = world.heightAt(f.x, f.z, f.y);
   }
 
-  /** Uses the Build tool where the hand is: sets the piece down, turns it, takes it away, or clears them. */
+  /** Sets the piece in hand down where the hand is; one taken up from where it was built leaves the hand empty again. */
   #build() {
     const hands = this.hands;
     const action = buildAction(hands.variant.id);
     const aim = action && !hands.fixed.has("build") ? this.#pointBuild() : null;
-    if (action && aim && this.builder.use(action, this.#fliesAt, this.life.pantry.foods)) {
+    if (action && aim && this.builder.use(action)) {
       hands.events.built = true;
       this.#rebuilt();
       this.#learn("build");
       this.haptics.feel("drop");
+      if (this.#carried) this.#take("hand");
       return;
     }
     hands.events.blocked = true;
     this.#refuse();
   }
 
-  /** What the Build tool in hand points at, if it is in hand and building is on here. */
+  /** The empty hand takes up the piece it is on: in hand, it goes wherever it is set down next, or is put away. Whether there was one. */
+  #grab(): boolean {
+    const hands = this.hands;
+    const builder = this.builder;
+    if (hands.fixed.has("build")) return false;
+    const foods = this.life.pantry.foods;
+    const aim = builder.point("remove", hands.pointer, false, this.life.body.position, this.#fliesAt, foods);
+    if (!aim.ok) return false;
+    const piece = builder.pieces[aim.target];
+    const kind = piece.kind;
+    const turns = piece.turns;
+    if (!builder.use("remove")) return false;
+    this.#rebuilt();
+    this.#take("build", TOOLS[toolIndex("build")].variants.findIndex((v) => v.id === kind));
+    builder.turns = turns;
+    this.#carried = true;
+    hands.events.built = true;
+    this.haptics.feel("drop");
+    return true;
+  }
+
+  /** What is under the hand: one of this device's flies (within the feather's reach), a piece built, or the rest of the world. */
+  #under(): Under {
+    const p = this.hands.pointer;
+    for (const f of this.#fliesAt) if (Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z) < FEATHER_REACH) return "fly";
+    const aim = this.hands.fixed.has("build") ? null : this.builder.point("remove", p, false, this.life.body.position, this.#fliesAt, this.life.pantry.foods);
+    return aim?.ok ? "piece" : "world";
+  }
+
+  /** A piece in hand turned an eighth of a turn, and those after it go down that way. */
+  #turnPiece(dir: -1 | 1) {
+    this.builder.turns = (this.builder.turns + dir + 8) % 8;
+    this.hands.events.built = true;
+  }
+
+  /** Where a piece in hand would go, or the piece the empty hand is on, if building is on here. */
   #pointBuild(): Aim | null {
     const hands = this.hands;
-    const action = hands.current.id === "build" && !hands.fixed.has("build") ? buildAction(hands.variant.id) : null;
+    if (hands.fixed.has("build")) return null;
+    const id = hands.current.id;
+    const action = id === "build" ? buildAction(hands.variant.id) : id === "hand" && !hands.following ? "remove" : null;
     return action && this.builder.point(action, hands.pointer, hands.following, this.life.body.position, this.#fliesAt, this.life.pantry.foods);
   }
 
@@ -993,6 +1075,8 @@ export class Game implements Shell {
     }
     this.#hudLayout = hudLayout(frame, !this.devices.pointing && this.settings.hints);
     this.#hud.layout = this.#hudLayout;
+    this.#hud.coarse = frame.coarse;
+    this.#hud.unit = frame.unit;
     this.#loadingLayout = loadingLayout(frame);
     this.eyes.layout(frame, this.#hudLayout);
     this.#layCorners(true);
@@ -1268,7 +1352,10 @@ export class Game implements Shell {
   #entered() {
     const current = this.nav.current;
     if (current !== "online") this.typing?.end();
-    if (current !== "play") this.screens[current].enter();
+    if (current !== "play") {
+      this.screens[current].enter();
+      this.tray.hide();
+    }
     this.#frameRoom();
     this.#syncCamera();
     this.#grip = this.#grip && { kind: "spent" };
@@ -1296,6 +1383,7 @@ export class Game implements Shell {
     if (this.wallpaper) return;
     this.wallpaper = true;
     this.hands.release();
+    this.tray.hide();
     this.#controls.reset();
     this.director.startWallpaper();
     this.director.title = false;
@@ -1358,7 +1446,8 @@ export class Game implements Shell {
     this.hands.update(dt, { use: false, holding: playing && holding, eye: this.#eye }, life.body, life.pantry);
     this.#moveFinger(dt, playing);
     this.#held = this.hands.stroking || this.hands.blowing ? this.#held + dt : 0;
-    if (this.#held > HOLD_TAUGHT) this.#learn(this.hands.current.id);
+    // The empty hand's stroking is taught by moving the hand, which it needs first.
+    if (this.#held > HOLD_TAUGHT && this.hands.current.id !== "hand") this.#learn(this.hands.current.id);
     this.#live(dt);
     this.#feel();
     this.eyes.beforeStep();
@@ -1372,7 +1461,7 @@ export class Game implements Shell {
     this.#reactions();
     this.#paddle(dt);
     const hands = this.hands;
-    this.haptics.held(playing && hands.current.id === "feather" ? Math.max(hands.stroke, this.#companyStroke) : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
+    this.haptics.held(playing && TOOLS[hands.shownTool].id === "feather" ? Math.max(hands.stroke, this.#companyStroke) : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
     this.meter.update(life.brain, now);
     if (this.quality) {
       // Loading and the building of a place aren't this device's everyday pace.
@@ -1417,11 +1506,12 @@ export class Game implements Shell {
     }
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle, this.#middles);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
-    // With the camera in hand, the hand is off the table.
-    this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper && this.hands.current.id !== "photo" ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
+    // With the camera in hand, or the tray open, the hand is off the table; watching, it fades with the controls, unless the feather in it rests on the fly, which must be seen.
+    const handShown = this.nav.current === "play" && !this.wallpaper && this.hands.current.id !== "photo" && !this.tray.open ? Math.max(this.#presence, TOOLS[this.hands.shownTool].id === "feather" || this.hands.blowing ? 1 : 0) : 0;
+    this.handsView.opacity += (handShown - this.handsView.opacity) * Math.min(1, dt * 5);
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
     this.#buildAim = playing ? this.#pointBuild() : null;
-    this.kit.update(this.builder, this.#buildAim, this.hands.variant.id === "remove", this.handsView.opacity, this.time, stage.light, stage.weather, (stage.current.open ?? 1) >= 1);
+    this.kit.update(this.builder, this.#buildAim, this.handsView.opacity, this.time, stage.light, stage.weather, (stage.current.open ?? 1) >= 1);
     this.fingerView.update(this.finger, this.#floorAt);
 
     this.#overlay(dt);
@@ -1747,7 +1837,8 @@ export class Game implements Shell {
     const { remote, devices } = this;
     const { pointers, keyboard, pads } = this.#inputs;
     const nowMs = performance.now();
-    pads?.poll(dt, nowMs, this.nav.current !== "play" || this.#loading);
+    // In a menu, or the tray, the stick steps as the arrows do.
+    pads?.poll(dt, nowMs, this.nav.current !== "play" || this.#loading || this.tray.open);
     // A press, a finger on the remote, a tap or a click, a key, a pad, a mouse moved as if meant: not a nudge of the desk.
     const pressed = remote.presses.length > 0 || remote.touch.touching || devices.at > this.#seenInput;
     this.#seenInput = devices.at;
@@ -1814,13 +1905,14 @@ export class Game implements Shell {
     const playing = this.nav.current === "play" && !this.wallpaper;
     if (keyboard && playing) {
       for (const action of keyboard.actions) {
-        if (action.kind === "tool") this.#chooseTool(action.index);
+        if (action.kind === "tray") this.#openTray();
         else this.#home();
       }
     }
     if (playing && (remote.dx !== 0 || remote.dy !== 0)) {
-      // With the View tool in hand the hand has nothing to do, so a swipe turns the camera, as a drag does.
-      if (this.hands.current.id === "view" || this.hands.current.id === "photo") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
+      // The tray open, a swipe picks what is that way round it; with the camera in hand (or Why? playing) the hand has nothing to do, so a swipe turns the camera, as a drag does.
+      if (this.tray.open) this.#swipeTray(remote.dx, remote.dy);
+      else if (this.hands.current.id === "photo" || this.hands.view === "why") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
       else this.#movePointer(remote.dx, remote.dy);
     }
     if (playing) this.#steer(dt);
@@ -1829,6 +1921,9 @@ export class Game implements Shell {
       this.#followAim();
       this.#setCursor();
     }
+    if (playing) this.#controls.tick(this.#target);
+    if (!remote.touch.touching) this.#traySwipe.x = this.#traySwipe.y = 0;
+    this.#present(dt, idle);
     this.#ringShown = !devices.pointing;
   }
 
@@ -1888,7 +1983,6 @@ export class Game implements Shell {
     hands.chooseView(view);
     this.#shelf.view = { kind: view, at: Date.now() };
     saveShelf(this.#shelf);
-    if (hands.current.id === "view") this.#changedAt = this.time;
   }
 
   /** The camera back to Follow's distance and pitch, at the same yaw. */
@@ -1898,29 +1992,32 @@ export class Game implements Shell {
     this.#viewFollows();
   }
 
-  /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead, or, with the camera in hand, takes a photo. */
-  #chooseTool(index: number) {
-    const hands = this.hands;
-    if (hands.chooseTool(index)) {
-      this.#learn("tools");
-      this.#changedAt = this.time;
-    } else if (index === hands.tool && hands.current.id === "photo") this.#snap();
-    else if (index === hands.tool) {
-      // The one in hand again: what Select does with it, on the dial Select steps.
-      const dial = hands.current.second ? 1 : 0;
-      if (hands.stepVariant(1, true, dial)) this.#variantChanged(dial);
-    }
+  /** A swipe on the remote's surface with the tray open: once it has gone far enough one way, what is that way round the ring is lit. */
+  #swipeTray(dx: number, dy: number) {
+    const swipe = this.#traySwipe;
+    swipe.x += dx;
+    swipe.y += dy;
+    if (Math.hypot(swipe.x, swipe.y) < TRAY_SWIPE) return;
+    // Clockwise from up; the surface's y is up, as the ring's top is.
+    this.tray.aim(Math.atan2(swipe.x, swipe.y));
   }
 
-  /** The tool's kind on a dial, stepped by a pointer: round and round. */
-  #stepKind(dir: -1 | 1, dial: Dial) {
-    if (this.hands.stepVariant(dir, true, dial)) this.#variantChanged(dial);
-    else this.#refuse();
+  /** How much the controls show: all of them while the player is at it, fading once they only watch. */
+  #present(dt: number, idle: number) {
+    const at = this.tray.open || this.#controls.pressed || idle < PRESENT_FOR || this.remote.held.size > 0;
+    const goal = at ? 1 : 0;
+    this.#presence += (goal - this.#presence) * Math.min(1, dt * (at ? PRESENCE_IN : PRESENCE_OUT));
+    if (Math.abs(goal - this.#presence) < 0.004) this.#presence = goal;
+    this.tray.update(dt);
   }
 
-  /** Uses the tool in hand where the pointer is, as Select does. */
+  /** Uses the tool in hand where the pointer is, as Select does. The empty hand takes up the piece it is on; held, it strokes. */
   #useTool() {
     const hands = this.hands;
+    if (hands.current.id === "hand") {
+      if (this.#grab()) this.#learn("hand");
+      return;
+    }
     if (hands.current.id === "build") {
       this.#build();
       return;
@@ -2040,9 +2137,20 @@ export class Game implements Shell {
         if (this.hands.events.dropped) this.#learn("feed");
         if (this.hands.events.swooped) this.#learn("swoop");
       },
+      under: () => this.#under(),
+      grab: () => this.#grab(),
+      offerFinger: () => {
+        this.#take("finger");
+        this.finger.putDown();
+        this.#learn("finger");
+      },
+      putAway: () => this.#putAway(),
       pressHud: (hit) => this.#pressHud(hit),
-      stepKind: (dir, dial) => this.#stepKind(dir, dial),
-      stepTool: (dir) => this.#chooseTool((this.hands.tool + dir + TOOLS.length) % TOOLS.length),
+      trayOpen: () => this.tray.open,
+      closeTray: () => this.tray.hide(),
+      hoverHud: (hit) => {
+        if (hit?.kind === HUD_HITS.slot) this.tray.point(hit.index);
+      },
       turn: (yaw, pitch) => this.#turnCamera(yaw, pitch),
       zoom: (factor) => this.#zoomCamera(factor),
       holdCamera: (held) => {
@@ -2063,15 +2171,21 @@ export class Game implements Shell {
   /** A tap on something on the HUD. */
   #pressHud(hit: Hit) {
     switch (hit.kind) {
-      case HUD_HITS.tool:
-        this.#chooseTool(hit.index);
+      case HUD_HITS.held:
+        this.#openTray();
         break;
-      case HUD_HITS.kind:
-      case HUD_HITS.label:
-        this.#stepKind(hit.value < 0 ? -1 : 1, hit.index as Dial);
+      case HUD_HITS.rotate:
+        this.#turnPiece(1);
         break;
-      case HUD_HITS.go:
-        this.#goToPlace();
+      case HUD_HITS.putAway:
+        this.#putAway();
+        break;
+      case HUD_HITS.slot:
+        this.tray.point(hit.index);
+        this.#takeFromTray(this.tray.items[hit.index] ?? null);
+        break;
+      case HUD_HITS.back:
+        this.tray.back();
         break;
       case HUD_HITS.menu:
         this.#toMenu();
@@ -2202,50 +2316,182 @@ export class Game implements Shell {
   }
 
   #playPress(button: RemoteButton, repeat: boolean) {
+    if (this.tray.open) {
+      this.#trayPress(button, repeat);
+      return;
+    }
     const hands = this.hands;
     switch (button) {
       case "left":
-      case "right":
-        hands.stepTool(button === "left" ? -1 : 1);
-        this.#changedAt = this.time;
-        this.#learn("tools");
+      case "right": {
+        const dir = button === "left" ? -1 : 1;
+        // A piece in hand turns; otherwise the camera goes round the fly an eighth of a turn, the way a drag that way would take it.
+        if (hands.current.id === "build" && !hands.fixed.has("build")) this.#turnPiece(dir);
+        else {
+          this.#turnCamera(-dir * ARROW_ROUND, 0);
+          this.#learn("camera");
+        }
         break;
+      }
       case "up":
       case "down":
-        // Framing a photo, Up brings the camera in and Down takes it out, held or pressed.
-        if (hands.current.id === "photo") {
-          this.#zoomCamera(button === "up" ? 1 / NOTCH_ZOOM : NOTCH_ZOOM);
-          break;
-        }
-        // Up goes to the earlier kind in the list, as a list reads top to bottom.
-        if (hands.stepVariant(button === "up" ? -1 : 1)) this.#variantChanged();
-        else if (!repeat) this.#refuse();
+        // Up brings the camera in and Down takes it out, held or pressed.
+        this.#zoomCamera(button === "up" ? 1 / NOTCH_ZOOM : NOTCH_ZOOM);
+        this.#learn("camera");
         break;
       case "select":
         if (repeat) break;
-        if (hands.current.id === "place") {
-          if (this.#goToPlace()) this.#learn("place");
-        } else if (hands.current.id === "sky" || hands.current.id === "view") {
-          // Select steps round the weathers (Up and Down have the times of day) or the views, for a remote held in one hand.
-          const dial = hands.current.second ? 1 : 0;
-          if (hands.stepVariant(1, true, dial)) this.#variantChanged(dial);
-          else this.#refuse();
-        } else {
-          this.#useTool();
-          if (hands.events.dropped) this.#learn("feed");
-          if (hands.events.swooped) this.#learn("swoop");
-        }
+        this.#useTool();
+        if (hands.events.dropped) this.#learn("feed");
+        if (hands.events.swooped) this.#learn("swoop");
+        break;
+      case "playPause":
+        if (!repeat) this.#openTray();
         break;
       case "back":
-      case "playPause":
-        if (!repeat) this.#toMenu();
+        if (!repeat) this.#back();
         break;
     }
   }
 
-  #variantChanged(dial: Dial = 0) {
+  /** The remote with the tray open: round it, into a ring or back out, and take what is lit. */
+  #trayPress(button: RemoteButton, repeat: boolean) {
+    const tray = this.tray;
+    switch (button) {
+      case "left":
+      case "up":
+        tray.step(-1);
+        break;
+      case "right":
+      case "down":
+        tray.step(1);
+        break;
+      case "select":
+        if (!repeat) this.#takeFromTray(tray.focused);
+        break;
+      case "back":
+        if (!repeat) tray.back();
+        break;
+      case "playPause":
+        if (!repeat) tray.hide();
+        break;
+    }
+  }
+
+  /** Back in play: out of a view that isn't the world's (its eyes, inside it, Why?), then what is in hand put away, then the menu. */
+  #back() {
+    const hands = this.hands;
+    if (hands.view === "eyes" || hands.view === "inside" || hands.view === "why") this.#chooseKind("view", 0, TOOLS[toolIndex("view")].variants.findIndex((v) => v.id === "follow"));
+    else if (hands.current.id !== "hand") this.#putAway();
+    else this.#toMenu();
+  }
+
+  #openTray() {
+    if (this.tray.open) this.tray.hide();
+    else this.tray.show(this.hands);
+    this.#traySwipe.x = this.#traySwipe.y = 0;
+    this.#learn("tray");
+  }
+
+  /** Takes a thing from the tray: into the hand, or a kind chosen, or another ring opened. */
+  #takeFromTray(item: TrayItem | null) {
+    if (!item) return;
+    if (this.#unavailable(item)) {
+      this.#refuse();
+      return;
+    }
+    const a = item.action;
+    const hands = this.hands;
+    switch (a.kind) {
+      case "page":
+        this.tray.enter(a.page, hands);
+        return;
+      case "take":
+        this.#take(a.tool, a.variant);
+        break;
+      case "choose":
+        this.#chooseKind(a.tool, a.dial, a.variant);
+        break;
+      case "go":
+        hands.variants[PLACE_TOOL] = a.variant;
+        this.#goToPlace();
+        break;
+      case "clear":
+        if (a.what === "food") hands.clearDropped(this.life.pantry);
+        else if (this.builder.point("clear", hands.pointer, false, this.life.body.position, this.#fliesAt, this.life.pantry.foods).ok && this.builder.use("clear")) this.#rebuilt();
+        break;
+    }
+    this.tray.hide();
+  }
+
+  /** Whether a thing in the tray can't be taken here and now: building away from home, the sky and the place at a table, going where it already is, clearing nothing. */
+  #unavailable(item: TrayItem): boolean {
+    const a = item.action;
+    const fixed = this.hands.fixed;
+    if (a.kind === "take") return fixed.has(a.tool);
+    if (a.kind === "choose") return fixed.has(a.tool);
+    if (a.kind === "go") return fixed.has("place") || TOOLS[PLACE_TOOL].variants[a.variant].id === this.#here;
+    if (a.kind === "clear") return a.what === "built" && (fixed.has("build") || this.builder.pieces.length === 0);
+    if (a.kind === "page") return (a.page === "build" && fixed.has("build")) || (a.page === "place" && fixed.has("place")) || ((a.page === "time" || a.page === "weather") && fixed.has("sky"));
+    return false;
+  }
+
+  /** The name a thing in the tray goes by now: the whole-place view is named for what the fly stands on, and the weather's Now is Outside where it is the weather outside. */
+  #trayLabel(item: TrayItem): string {
+    if (item.id === "table" && item.action.kind === "choose") return `Whole ${this.hands.surface}`;
+    if (item.id === "now" && this.tray.page === "weather" && this.hands.outside) return "Outside";
+    return item.label;
+  }
+
+  /** Takes a tool into the hand, on a kind. A piece taken up brings the camera out to see where it goes; put away, it goes back. */
+  #take(id: ToolId, variant = 0) {
+    const hands = this.hands;
+    const was = hands.current.id;
+    const i = toolIndex(id);
+    hands.chooseTool(i);
+    hands.variants[i] = Math.max(0, variant);
+    hands.events.toolChanged = true;
     this.#changedAt = this.time;
-    const id = this.hands.current.id;
+    this.#carried = false;
+    if (id === "build" && was !== "build") this.#frameBuild(true);
+    else if (was === "build" && id !== "build") this.#frameBuild(false);
+  }
+
+  /** Puts away what is in hand: the hand is empty. A piece taken up from where it was built goes back in the kit. */
+  #putAway() {
+    if (this.hands.current.id === "hand") return;
+    this.#take("hand");
+  }
+
+  /** The camera out to see a piece of the kit where it goes, or back to where it was. */
+  #frameBuild(on: boolean) {
+    const director = this.director;
+    if (this.hands.view === "eyes" || this.hands.view === "why") return;
+    if (on) {
+      this.#beforeBuild = { distance: director.reach, pitch: director.pitch };
+      if (director.reach < BUILD_REACH) director.zoomBy(BUILD_REACH / director.reach);
+      if (director.pitch < BUILD_PITCH) director.turnBy(0, BUILD_PITCH - director.pitch);
+    } else if (this.#beforeBuild) {
+      const before = this.#beforeBuild;
+      this.#beforeBuild = null;
+      director.zoomBy(before.distance / director.reach);
+      director.turnBy(0, before.pitch - director.pitch);
+    }
+    this.#viewFollows();
+  }
+
+  /** Chooses a kind on a tool's dial without taking it up: a view, the time of day, the weather. */
+  #chooseKind(id: ToolId, dial: Dial, variant: number) {
+    const i = toolIndex(id);
+    if (i < 0 || variant < 0 || this.hands.fixed.has(id)) {
+      this.#refuse();
+      return;
+    }
+    (dial === 1 ? this.hands.seconds : this.hands.variants)[i] = variant;
+    this.#kindChanged(id, dial);
+  }
+
+  #kindChanged(id: ToolId, dial: Dial = 0) {
     if (id === "sky" || id === "view") this.#learn(id);
     if (id === "sky") {
       this.#followLight();
@@ -2257,12 +2503,10 @@ export class Game implements Shell {
       if (this.hands.view === "why") this.why.open(this.recorder);
     }
     // A table's light and weather aren't this player's own to come back to; in a room open to everyone they are.
-    if (!this.online || this.online.everyone || id !== "sky") this.#remember(dial);
+    if (!this.online || this.online.everyone || id !== "sky") this.#remember(id, dial);
   }
 
-  /** Keeps the kind just chosen on a dial, if it is one a launch comes back to. */
-  #remember(dial: Dial) {
-    const tool = this.hands.current.id;
+  #remember(tool: ToolId, dial: Dial) {
     for (const id of Object.keys(KEPT) as DialId[]) {
       if (DIALS[id].tool !== tool || DIALS[id].dial !== dial) continue;
       this.#shelf[id] = { kind: this.hands.kindOf(id), at: Date.now() };
@@ -2320,17 +2564,18 @@ export class Game implements Shell {
     if (current === "play") {
       const life = this.life;
       const hud = this.#hud;
+      const hands = this.hands;
       hud.activity = life.activity;
-      hud.previewTool = this.#controls.previewTool;
-      hud.here = this.#here;
       hud.food = life.senses.tasting.food?.name ?? null;
       hud.hints = this.settings.hints;
       hud.glyphs = glyphs;
       hud.teachSwipe = !this.#touched;
+      hud.presence = this.#presence;
       hud.changed = this.time - this.#changedAt;
       hud.brainRunning = this.brain.status === "running";
       hud.pressed = this.#controls.preview;
       hud.shutter = this.photos.sinceShutter;
+      hud.canBuild = !hands.fixed.has("build");
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
@@ -2340,24 +2585,23 @@ export class Game implements Shell {
       } else hud.eyes = null;
       const k = this.#hudKey;
       const pressedChanged = k.pressed !== hud.pressed;
-      const changed = pressedChanged || k.preview !== hud.previewTool || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
-      if (changed || hud.changed < 0.3 || this.photos.sinceShutter < SHUTTER_FLASH + 0.05 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
-        k.preview = hud.previewTool;
-        k.tool = this.hands.tool;
-        k.variant = this.hands.variants[this.hands.tool];
+      const changed = pressedChanged || k.tool !== hands.tool || k.variant !== hands.variants[hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.fixed !== hands.fixed.has(hands.current.id) || k.outside !== hands.outside || k.surface !== hands.surface || k.running !== hud.brainRunning || k.tray !== this.tray.changes || k.open !== this.tray.open;
+      if (changed || hudMoving(hud) || this.photos.sinceShutter < SHUTTER_FLASH + 0.05 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
+        k.tool = hands.tool;
+        k.variant = hands.variants[hands.tool];
         k.activity = hud.activity;
         k.food = hud.food;
-        k.following = this.hands.following;
         k.touched = this.#touched;
         k.hints = hud.hints;
         k.eyes = !!hud.eyes;
         k.taught = this.#taught;
-        k.here = hud.here;
-        k.fixed = this.hands.fixed.has(this.hands.current.id);
-        k.outside = this.hands.outside;
-        k.surface = this.hands.surface;
+        k.fixed = hands.fixed.has(hands.current.id);
+        k.outside = hands.outside;
+        k.surface = hands.surface;
         k.running = hud.brainRunning;
         k.pressed = hud.pressed ?? null;
+        k.tray = this.tray.changes;
+        k.open = this.tray.open;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }

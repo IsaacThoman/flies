@@ -139,14 +139,12 @@ test("on the TV the remote's keys are the remote's, as they always were", () => 
   assert.equal(remote.held.size, 0);
 });
 
-test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera back to Follow; held, Q and E turn it, W and S tilt it and + and − zoom it", () => {
-  assert.deepEqual(keyAction("Digit1", "1"), { kind: "tool", index: 0 });
-  assert.deepEqual(keyAction("Numpad8", "8"), { kind: "tool", index: 7 });
+test("a keyboard's own keys: Tab opens the tray, R or Home takes the camera back to Follow; held, Q and E turn it, W and S tilt it and + and − zoom it", () => {
+  assert.deepEqual(keyAction("Tab", "Tab"), { kind: "tray" });
   assert.deepEqual(keyAction("KeyR", "r"), { kind: "home" });
   assert.deepEqual(keyAction("Home", "Home"), { kind: "home" });
   assert.equal(keyAction("KeyA", "a"), null);
-  // The tenth tool is 0, after 9, as the keys lie.
-  assert.deepEqual(keyAction("Digit0", "0"), { kind: "tool", index: 9 });
+  assert.equal(keyAction("Digit1", "1"), null);
   assert.deepEqual(keyAxis("Equal", "+"), { axis: "zoom", dir: -1 });
   assert.deepEqual(keyAxis("Minus", "-"), { axis: "zoom", dir: 1 });
   assert.deepEqual(keyAxis("KeyQ", "q"), { axis: "turn", dir: -1 });
@@ -174,6 +172,24 @@ test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera 
   key("keydown", "KeyR", "r", { repeat: true });
   key("keydown", "KeyR", "r", { ctrlKey: true });
   assert.deepEqual(keyboard.actions, [{ kind: "home" }], "once, and never with the browser's own shortcuts");
+});
+
+test("Tab opens the tray only when it is the tray's: elsewhere the browser keeps it, to move focus, unprevented", () => {
+  const devices = new Devices("mouse");
+  const target = new EventTarget();
+  const remote = new Remote(target as unknown as Window, () => 1, devices, "keys");
+  let playing = false;
+  const keyboard = new Keyboard(target as unknown as Window, remote, devices, () => 7, () => playing);
+  const tab = () => {
+    let prevented = false;
+    target.dispatchEvent(Object.assign(new Event("keydown"), { code: "Tab", key: "Tab", repeat: false, preventDefault: () => (prevented = true) }));
+    return prevented;
+  };
+  assert.equal(tab(), false);
+  assert.deepEqual(keyboard.actions, []);
+  playing = true;
+  assert.equal(tab(), true);
+  assert.deepEqual(keyboard.actions, [{ kind: "tray" }]);
 });
 
 test("a second tap or click soon after the first, in the same place, is a double one; a third starts again", () => {

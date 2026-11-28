@@ -1,7 +1,7 @@
 import UIKit
 
 /// What the player feels through the glass while they play: the fly's own touch while the feather
-/// is on it, and a knock when it takes off. Both come from the fly's state as the game publishes it
+/// (or the empty hand, which strokes with it) is on it, and a knock when it takes off. Both come from the fly's state as the game publishes it
 /// (its `touch` sense, the tool in hand and its count of take-offs), so they are what happened to
 /// the fly and nothing else; never in the wallpaper, where nobody's finger is on the screen. Off
 /// with the Haptics switch in the app's page of the Settings app, or with the system's own.
@@ -36,6 +36,7 @@ final class Haptics {
   /// `before` is the count of take-offs at the last change, nil at the first.
   static func feel(screen: String?, wallpaper: Bool, tool: String?, touch: Double, takeoffs: Int, before: Int?) -> Feel {
     guard screen == "play", !wallpaper else { return Feel() }
-    return Feel(leap: before.map { takeoffs > $0 } ?? false, feather: tool == "feather" && touch > featherTouch ? min(1, touch) : nil)
+    let stroking = tool == "feather" || tool == "hand"
+    return Feel(leap: before.map { takeoffs > $0 } ?? false, feather: stroking && touch > featherTouch ? min(1, touch) : nil)
   }
 }

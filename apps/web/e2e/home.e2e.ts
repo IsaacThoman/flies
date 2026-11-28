@@ -1,8 +1,5 @@
-// The fly at home, under its sky: the Sky reaches every time of day and every
-// weather from the remote (Up and Down the time, Select round the weather)
-// and from a mouse (each label's arrows, a click on it, the wheel over it, a
-// drag along it); and the fly goes round the places only in the screensaver,
-// when chosen, and is carried home when play begins.
+// At home, choose every time and weather through the tray with keys and
+// with a mouse, then check when the screensaver tours the places.
 //
 //   node apps/web/e2e/home.e2e.ts [--url http://localhost:5173/]
 //
@@ -12,8 +9,8 @@ import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { parseArgs } from "node:util";
 import type { Page } from "playwright";
-import { canvasPoint, openGame, readState, startServer, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
-import { LABEL_SWIPE } from "../src/controls.ts";
+import { canvasPoint, openGame, readState, startServer, swipe, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { chooseFromTray, waitForTray } from "./tray.ts";
 import type { Game } from "../src/game.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import { TOOLS } from "../src/tools/hands.ts";
@@ -39,75 +36,54 @@ try {
   await waitFor(page, "brain=running,screen=title", 120_000);
   await page.keyboard.press("Enter");
   await waitFor(page, "screen=play,home=picnic,place=picnic,visit=-1,table=");
-  const press = async (key: string, times = 1) => {
-    for (let i = 0; i < times; i++) {
-      await page.keyboard.press(key);
-      await waitForGameTime(page, 0.12);
-    }
-  };
+  step("remote: a swipe focuses World, and Back goes up a ring before closing the tray");
+  await page.keyboard.press("Space");
+  await waitForTray(page, "root", 0);
+  await swipe(page, [0, 0], [-0.6, 0.6]);
+  await waitForTray(page, "root", 7);
+  await page.keyboard.press("Enter");
+  await waitForTray(page, "world");
+  await page.keyboard.press("Escape");
+  await waitForTray(page, "root", 7);
+  await page.keyboard.press("Escape");
+  await waitForTray(page, null);
+  await waitFor(page, "screen=play,tool=hand");
+  // The remote ignores arrow presses briefly after a swipe.
+  await waitForGameTime(page, 0.4);
 
-  step("the remote: along the shelf to the Sky, Up and Down through every time of day, Select round every weather");
-  for (let i = 0; i < TOOLS.length && (await readState(page)).tool !== "sky"; i++) {
-    const at = (await readState(page)).tool;
-    await page.keyboard.press("ArrowRight");
-    await waitFor(page, `tool~^(?!${at}$)`, 5000);
+  step("remote and mouse: every time and weather is chosen without taking anything into the hand");
+  const click = async (kind: string, index?: number) => {
+    const p = await canvasPoint(page, await targetOf(page, kind, index));
+    await page.mouse.click(p.x, p.y);
+  };
+  const mouse = async () => {
+    const start = await canvasPoint(page, [0.4, 0.4]);
+    const end = await canvasPoint(page, [0.5, 0.5]);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.move(end.x, end.y, { steps: 8 });
+    await waitFor(page, "device=mouse");
+  };
+  for (const tap of [undefined, click]) {
+    if (tap) await mouse();
+    for (const time of [...TIMES.slice(1), TIMES[0]]) {
+      await chooseFromTray(page, ["world", "time", time], tap);
+      await waitFor(page, time === "clock" ? "sky=clock/now,sunFrom=clock" : `sky=${time}/now,time=${time},sunFrom=chosen`);
+    }
+    for (const weather of [...WEATHERS.slice(1), WEATHERS[0]]) {
+      await chooseFromTray(page, ["world", "weather", weather], tap);
+      await waitFor(page, `sky=clock/${weather},tool=hand`);
+    }
+    await waitFor(page, "weatherFrom=forecast");
   }
-  await waitFor(page, "tool=sky,sky=clock/now");
-  await press("ArrowUp");
-  assert.equal((await readState(page)).sky, "clock/now", "Up past the first time is refused");
-  for (const time of TIMES.slice(1)) {
-    await press("ArrowDown");
-    await waitFor(page, `sky=${time}/now,time=${time},sunFrom=chosen`);
-  }
-  for (const weather of [...WEATHERS.slice(1), WEATHERS[0]]) {
-    await press("Enter");
-    await waitFor(page, `sky=night/${weather}`);
-  }
-  await waitFor(page, "weatherFrom=forecast");
-  await press("ArrowUp", TIMES.length);
-  await waitFor(page, "sky=clock/now,sunFrom=clock");
   assert.equal(await game<boolean>(page, "g.hands.fixed.size === 0 && JSON.parse(localStorage.getItem('flies.learned')).sky === true"), true, "the Sky's hint is learned");
 
-  step("a mouse: each label's arrows either way, a click on it, the wheel over it and a drag along it, through every choice on each dial");
-  const box = await canvasPoint(page, [0, 0]);
-  // Moved as if meant, the mouse is in hand: the labels have arrows to press.
-  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.4);
-  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5, { steps: 8 });
-  await waitFor(page, "device=mouse");
-  for (const [dial, kinds] of [[0, TIMES], [1, WEATHERS]] as const) {
-    const at = (i: number) => kinds[((i % kinds.length) + kinds.length) % kinds.length];
-    const shows = (i: number) => `sky~${dial === 0 ? `^${at(i)}/` : `/${at(i)}$`}`;
-    const click = async (kind: string, dir?: number) => {
-      const p = await canvasPoint(page, await targetOf(page, kind, dir, dial));
-      await page.mouse.click(p.x, p.y);
-    };
-    // Round by the right arrow, back by the left.
-    for (let i = 1; i <= kinds.length; i++) {
-      await click("kind", 1);
-      await waitFor(page, shows(i));
-    }
-    await click("kind", -1);
-    await waitFor(page, shows(-1));
-    await click("kind", 1);
-    await waitFor(page, shows(0));
-    // A click on the label steps on.
-    await click("label");
-    await waitFor(page, shows(1));
-    // The wheel over it: a notch a step.
-    const label = await canvasPoint(page, await targetOf(page, "label", undefined, dial));
-    await page.mouse.move(label.x, label.y);
-    await page.mouse.wheel(0, 100);
-    await waitFor(page, shows(2));
-    await page.mouse.wheel(0, -100);
-    await waitFor(page, shows(1));
-    // Dragged along it, the kinds go by as a carousel's would: to the left, the next.
-    const along = ((LABEL_SWIPE * 1.5) / (await game<number>(page, "g.shape.design.width"))) * box.width;
-    await page.mouse.move(label.x, label.y);
-    await page.mouse.down();
-    await page.mouse.move(label.x - along, label.y, { steps: 6 });
-    await page.mouse.up();
-    await waitFor(page, shows(2));
-  }
+  await chooseFromTray(page, ["world", "weather"], click);
+  await click("trayBack");
+  await waitForTray(page, "world");
+  await click("trayBack");
+  await waitForTray(page, "root");
+  await click("held");
+  await waitForTray(page, null);
 
   step("the places go round only in the screensaver, and play is at home");
   await game(page, "(g.settings.wallpaperPlaces = 'turns', g.tour.turn = 2, g.applySettings())");

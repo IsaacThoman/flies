@@ -4,12 +4,10 @@
 // still there after a reload, and Clear built takes them away.
 
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import type { Browser, Page } from "playwright";
-import { openGame, readState, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
+import { openGame, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
-import { TOOLS } from "../src/tools/hands.ts";
-
-const BUILD = TOOLS.find((t) => t.id === "build")!;
 
 const { url, server } = await startServer();
 let browser: Browser | undefined;
@@ -25,20 +23,6 @@ async function press(page: Page, key: string, count = 1) {
     await page.keyboard.press(key);
     await waitForGameTime(page, 0.12);
   }
-}
-
-/** The Build tool in hand, on this kind. */
-async function choose(page: Page, kind: string) {
-  for (let i = 0; i < TOOLS.length; i++) {
-    const at = (await readState(page)).tool;
-    if (at === "build") break;
-    await page.keyboard.press("ArrowRight");
-    await waitFor(page, `tool~^(?!${at}$)`);
-  }
-  await waitFor(page, "tool=build");
-  await press(page, "ArrowUp", BUILD.variants.length);
-  await press(page, "ArrowDown", BUILD.variants.findIndex((v) => v.id === kind));
-  await waitFor(page, `variant=${kind}`);
 }
 
 /** Sets the fly down at a point, on whatever is highest there, as the Place tool sets it down; the brain carries on from there. */
@@ -120,7 +104,7 @@ try {
   await play(page);
   // Somewhere open, facing out over the table.
   await setDown(page, -40, -190, 0);
-  await choose(page, "tile-blue");
+  await chooseFromTray(page, ["build", "tile-blue"]);
   // The hand waits just in front of the fly: the tile goes down as near as it has room.
   // Before it, the kit draws only its ghost; after, the pieces and their shadows too.
   const before = await kitDraws(page);
@@ -137,7 +121,7 @@ try {
   assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.life.body.position.y), 0.5);
 
   // A wall across its way: a walking fly doesn't get through it.
-  await choose(page, "wall");
+  await chooseFromTray(page, ["build", "wall"]);
   await build(page, "wall", 2, { x: -40, z: -150 });
   const wall = (await pieces(page))[1];
   assert.deepEqual([wall.kind, wall.x, wall.z], ["wall", -40, -150], "the wall where the hand put it");
@@ -175,8 +159,7 @@ try {
 
   // Clear built takes everything built here away.
   await setDown(page, -40, -190, 0);
-  await choose(page, "clear");
-  await press(page, "Enter");
+  await chooseFromTray(page, ["world", "clearBuilt"]);
   await waitFor(page, "built=0");
   assert.deepEqual(errors, []);
   console.log(`build: a tile with the remote's buttons (the kit's draws ${before} to ${after}), stood on, a wall not walked into, both kept across a reload, cleared`);

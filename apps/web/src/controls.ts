@@ -3,31 +3,36 @@
 // and the camera. The game is the target: it says what is under a point and
 // does what it is asked.
 //
-// The conventions are a map's and a 3D viewer's, and the camera is a plain
-// orbit round the fly (orbit.ts). A drag turns it round the fly and up or
-// down, wherever it starts, with whichever button, by the same amount for the
-// same distance dragged every time, unless the tool in hand is one that is
-// held on the fly (the feather, the air) or placed in the world (the
-// fingertip), which a left-button drag over the table carries. A mouse wheel's clicks and a pinch bring it in and take it
-// out, and nothing else; a trackpad's two-finger scroll turns it round and up,
-// as a drag does. A click or a tap uses the tool where it lands; a double
-// click or tap in the air takes the camera back to Follow's distance and
-// height, still on the same side of the fly. Where they leave the camera it
-// stays: nothing else moves it.
+// The hand does what makes sense for what is under it and what it holds.
+// Empty, held on the fly it strokes it; pressed on a piece built it takes it
+// up, and a drag carries it to where it is let go; held still on the table
+// it puts the fingertip down there. Holding food, the ball, a piece or the
+// camera, a tap uses it where it lands. The feather and a puff are held where
+// the pointer is, and the fingertip goes where a press goes and is carried by
+// a drag. Anywhere else a drag turns the camera round the fly (orbit.ts), the
+// same amount for the same distance every time, with whichever button; a
+// mouse wheel's clicks and a pinch bring it in and take it out; a trackpad's
+// two-finger scroll turns it. A double click or tap in the air takes it back
+// to Follow's distance and height. Where they leave the camera it stays.
+//
+// With the tray open a press on it takes what it is on, and a press anywhere
+// else closes it, and does nothing more.
 
 import { sameTarget } from "@fly/ui";
 import type { Hit } from "@fly/ui";
 import type { Gesture } from "./input.ts";
-import type { Dial } from "./tools/hands.ts";
-import { HUD_HITS } from "./ui/hud.ts";
 
 /**
- * How the tool in hand is used on the table: once, where a click or a tap
- * lands (food, the ball); held, where the pointer is held (the feather, the
+ * How the tool in hand is used on the table: the empty hand (`hand`), which
+ * does what is under it; once, where a click or a tap lands (food, the ball,
+ * a piece, the camera); held, where the pointer is held (the feather, the
  * air); placed, going where a press goes and carried by a drag, a tap putting
  * it down or lifting it (the fingertip); or not there at all.
  */
-export type ToolUse = "once" | "hold" | "place" | "none";
+export type ToolUse = "hand" | "once" | "hold" | "place" | "none";
+
+/** What is under the hand: the fly (or another), a piece built, or anything else of the world. */
+export type Under = "fly" | "piece" | "world";
 
 /** The game, as the controls see it. */
 export interface PlayTarget {
@@ -39,13 +44,22 @@ export interface PlayTarget {
   aim(x: number, y: number, follow: boolean): boolean;
   /** The pointer no longer says where the hand is: a finger lifted, the mouse left, a drag is turning the camera. */
   unaim(): void;
+  /** What is under the hand where it is now. */
+  under(): Under;
   /** Uses the tool in hand once, where the hand is. */
   use(): void;
-  /** A tap on something on the HUD, or a swipe along its label (a step of the kind on that label's dial). */
+  /** The empty hand takes up the piece under it; whether there was one it could. */
+  grab(): boolean;
+  /** The empty hand held still on the table: the fingertip comes down there. */
+  offerFinger(): void;
+  /** Puts what is in hand away: the hand is empty again. */
+  putAway(): void;
+  /** A tap on something on the HUD (or in the tray). */
   pressHud(hit: Hit): void;
-  stepKind(dir: -1 | 1, dial: Dial): void;
-  /** Steps the tool on the shelf (the wheel over it). */
-  stepTool(dir: -1 | 1): void;
+  /** The tray is open; a mouse over one of its things lights it. */
+  trayOpen(): boolean;
+  closeTray(): void;
+  hoverHud(hit: Hit | null): void;
   /** Turns the camera round the fly (radians round, and up). */
   turn(yaw: number, pitch: number): void;
   /** Brings the camera in (under 1) or takes it out, by a factor. */
@@ -61,27 +75,26 @@ export const DRAG_ROUND = 3;
 export const DRAG_UP = 1.6;
 /** One click of a mouse wheel brings the camera this much nearer or farther (the camera eases it in). */
 export const NOTCH_ZOOM = 1.2;
+/** A press on the table held this long (ms) without moving, with the hand empty, puts the fingertip down there. */
+export const LONG_PRESS = 550;
 /** A trackpad's pinch: how much nearer or farther per CSS pixel it reports (as a power of e). */
 const PINCH_ZOOM = 0.01;
 /** A trackpad's scroll: radians round, and up, per CSS pixel, in the same proportion as a drag's. */
 const SCROLL_ROUND = 0.006;
 const SCROLL_UP = (SCROLL_ROUND * DRAG_UP) / DRAG_ROUND;
-/** A swipe along the tool's label this far (design units) steps its kind; and the shelf's wheel steps a tool for this much trackpad scroll. */
-export const LABEL_SWIPE = 36;
-const SHELF_SCROLL = 140;
-/** A scroll over the shelf left alone this long (ms) starts again from nothing. */
-const SHELF_IDLE = 300;
 
 /** What a press is doing, until it lifts. */
 type Grip =
-  /** Down on the HUD: a tap presses it; along the label, a swipe steps the kind. */
-  | { kind: "hud"; hit: Hit; x: number; y: number; swiped: number; valid: boolean; over: boolean }
-  /** Down on the table with a tool used once: a tap uses it; moved, it turns the camera instead. */
-  | { kind: "press"; x: number; y: number }
-  /** Holding a held tool on the table. */
+  /** Down on the HUD: a tap presses it. */
+  | { kind: "hud"; hit: Hit; valid: boolean; over: boolean }
+  /** Down on the table: a tap uses what is in hand; moved, it turns the camera instead; held still with the hand empty, the fingertip comes down. */
+  | { kind: "press"; x: number; y: number; at: number }
+  /** Holding a held tool on the table, or the empty hand on the fly. */
   | { kind: "tool" }
-  /** Down on the table with a placed tool: a drag carries it, and a tap puts it down or lifts it. */
-  | { kind: "place" }
+  /** Down on the table with a placed tool: a drag carries it, and a tap puts it down or lifts it (`tap`; not when the press itself put it down). */
+  | { kind: "place"; tap: boolean }
+  /** A piece the empty hand took up: a drag carries it, and where it is let go it is set down. */
+  | { kind: "carry" }
   /** Turning the camera. */
   | { kind: "turn"; x: number; y: number }
   /** Nothing more until it lifts (something else took it). */
@@ -89,26 +102,26 @@ type Grip =
 
 export class PlayControls {
   #grip: Grip | null = null;
-  /** The shelf names a tool under the pointer without selecting it. */
-  previewTool = -1;
-  #shelf = { scrolled: 0, at: -Infinity };
-  readonly #design: () => { width: number; height: number };
   readonly #now: () => number;
 
-  constructor(design: () => { width: number; height: number }, now: () => number = () => performance.now()) {
-    this.#design = design;
+  constructor(now: () => number = () => performance.now()) {
     this.#now = now;
   }
 
   /** The provisional HUD target; no action occurs until an eligible release. */
   get preview(): Readonly<Hit> | null {
     const grip = this.#grip;
-    return grip?.kind === "hud" && grip.valid && grip.over && grip.swiped === 0 ? grip.hit : null;
+    return grip?.kind === "hud" && grip.valid && grip.over ? grip.hit : null;
   }
 
-  /** A held tool is being held on the table. */
+  /** A held tool, or the empty hand, is being held on the table. */
   get holding() {
     return this.#grip?.kind === "tool";
+  }
+
+  /** A piece the hand took up is being carried by a drag. */
+  get carrying() {
+    return this.#grip?.kind === "carry";
   }
 
   /** The camera is being turned by a drag. */
@@ -123,14 +136,21 @@ export class PlayControls {
 
   /** Whatever is pressed now does nothing more until it lifts (the wallpaper took over, a menu opened). */
   spend() {
-    this.previewTool = -1;
     if (this.#grip) this.#grip = { kind: "spent" };
   }
 
   /** Lets go of everything at once, without acting. */
   reset() {
-    this.previewTool = -1;
     this.#grip = null;
+  }
+
+  /** Each frame: a press on the table held still long enough with the hand empty puts the fingertip down there. */
+  tick(target: PlayTarget) {
+    const grip = this.#grip;
+    if (grip?.kind !== "press" || target.tool() !== "hand" || this.#now() - grip.at < LONG_PRESS) return;
+    target.offerFinger();
+    // Already down: letting go leaves it there.
+    this.#grip = { kind: "place", tap: false };
   }
 
   gesture(g: Gesture, target: PlayTarget, mouse: boolean) {
@@ -139,23 +159,27 @@ export class PlayControls {
       if (g.type === "up" || g.type === "cancel") this.#grip = null;
       return;
     }
-    const design = this.#design();
     switch (g.type) {
       case "hover": {
         const hit = target.hudAt(g.x, g.y);
-        this.previewTool = hit?.kind === HUD_HITS.tool ? hit.index : -1;
-        if (mouse) target.aim(g.x, g.y, !hit);
+        target.hoverHud(hit);
+        if (mouse && !target.trayOpen()) target.aim(g.x, g.y, !hit);
         return;
       }
       case "leave":
-        this.previewTool = -1;
+        target.hoverHud(null);
         target.unaim();
         return;
       case "down": {
         const hit = target.hudAt(g.x, g.y);
-        this.previewTool = hit?.kind === HUD_HITS.tool ? hit.index : -1;
         if (hit) {
-          this.#grip = { kind: "hud", hit: { ...hit }, x: g.x * design.width, y: g.y * design.height, swiped: 0, valid: true, over: true };
+          this.#grip = { kind: "hud", hit: { ...hit }, valid: true, over: true };
+          return;
+        }
+        // Open, the tray is all there is: a press anywhere else puts it away.
+        if (target.trayOpen()) {
+          target.closeTray();
+          this.#grip = { kind: "spent" };
           return;
         }
         // The right and middle buttons turn the camera wherever they are pressed.
@@ -164,16 +188,21 @@ export class PlayControls {
           return;
         }
         const onWorld = target.aim(g.x, g.y, true);
-        if (onWorld && target.tool() === "hold") this.#grip = { kind: "tool" };
-        else if (onWorld && target.tool() === "place") this.#grip = { kind: "place" };
-        else if (onWorld) this.#grip = { kind: "press", x: g.x, y: g.y };
-        else this.#turn(g.x, g.y, target);
+        const tool = target.tool();
+        if (!onWorld) this.#turn(g.x, g.y, target);
+        else if (tool === "hold") this.#grip = { kind: "tool" };
+        else if (tool === "place") this.#grip = { kind: "place", tap: true };
+        else if (tool === "hand") {
+          const under = target.under();
+          if (under === "fly") this.#grip = { kind: "tool" };
+          else if (under === "piece" && target.grab()) this.#grip = { kind: "carry" };
+          else this.#grip = { kind: "press", x: g.x, y: g.y, at: this.#now() };
+        } else this.#grip = { kind: "press", x: g.x, y: g.y, at: this.#now() };
         return;
       }
       case "drag":
-        this.previewTool = -1;
         if (!grip) return;
-        if (grip.kind === "tool" || grip.kind === "place") target.aim(g.x, g.y, true);
+        if (grip.kind === "tool" || grip.kind === "place" || grip.kind === "carry") target.aim(g.x, g.y, true);
         else if (grip.kind === "press") {
           if (!g.far) return;
           // Moved past a tap: it is turning the camera, from where it went down.
@@ -186,29 +215,26 @@ export class PlayControls {
         } else if (grip.kind === "hud") {
           if (g.far) grip.valid = false;
           grip.over = sameTarget(grip.hit, target.hudAt(g.x, g.y));
-          if (grip.hit.kind !== HUD_HITS.kind && grip.hit.kind !== HUD_HITS.label) return;
-          // Swiped along the label: the kinds go by as a carousel's would, the next coming from the right.
-          const dx = g.x * design.width - grip.x;
-          if (grip.swiped === 0 && Math.abs(dx) <= Math.abs(g.y * design.height - grip.y)) return;
-          const steps = Math.trunc(dx / LABEL_SWIPE) - grip.swiped;
-          grip.swiped += steps;
-          for (let i = 0; i < Math.abs(steps); i++) target.stepKind(steps < 0 ? 1 : -1, grip.hit.index as Dial);
         }
         return;
       case "up":
-        this.previewTool = -1;
         this.#grip = null;
         if (!grip) return;
         if (grip.kind === "hud") {
           const hit = target.hudAt(g.x, g.y);
-          if (g.tap && grip.valid && grip.swiped === 0 && sameTarget(grip.hit, hit)) target.pressHud(grip.hit);
+          if (g.tap && grip.valid && sameTarget(grip.hit, hit)) target.pressHud(grip.hit);
         } else if (grip.kind === "press") {
           if (g.tap && target.tool() === "once" && !target.hudAt(g.x, g.y) && target.aim(g.x, g.y, true)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "tool") {
           if (!mouse) target.unaim();
         } else if (grip.kind === "place") {
-          if (g.tap && !target.hudAt(g.x, g.y)) target.use();
+          if (grip.tap && g.tap && !target.hudAt(g.x, g.y)) target.use();
+          if (!mouse) target.unaim();
+        } else if (grip.kind === "carry") {
+          // Carried and let go, it goes down there; let go over the buttons at the foot, it is put away. A tap only took it up: it stays in hand.
+          if (!g.tap && target.hudAt(g.x, g.y)) target.putAway();
+          else if (!g.tap && target.aim(g.x, g.y, true)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "turn") {
           target.holdCamera(false);
@@ -218,24 +244,25 @@ export class PlayControls {
         }
         return;
       case "cancel":
-        this.previewTool = -1;
         if (grip?.kind === "turn") target.holdCamera(false);
         this.#grip = null;
         target.unaim();
         return;
       case "pinch":
-        this.previewTool = -1;
         // Two fingers: spread or pinched, nearer or farther; moved together, round.
         if (grip?.kind === "turn") target.holdCamera(false);
-        this.#grip = null;
+        if (grip?.kind !== "carry") this.#grip = null;
         target.zoom(1 / Math.max(0.2, g.scale));
         target.turn(-g.dx * DRAG_ROUND, g.dy * DRAG_UP);
         return;
       case "pinchEnd":
         return;
       case "wheel":
-        this.previewTool = -1;
-        this.#wheel(g, target);
+        if (target.hudAt(g.x, g.y) || target.trayOpen()) return;
+        if (g.zoom) target.zoom(Math.exp(g.dy * PINCH_ZOOM));
+        else if (g.notch) target.zoom(Math.pow(NOTCH_ZOOM, Math.sign(g.dy)));
+        // The page's content follows the fingers, so the camera turns as a drag the same way would.
+        else target.turn(g.dx * SCROLL_ROUND, -g.dy * SCROLL_UP);
         return;
     }
   }
@@ -244,29 +271,5 @@ export class PlayControls {
     this.#grip = { kind: "turn", x, y };
     target.unaim();
     target.holdCamera(true);
-  }
-
-  /** The wheel, or a trackpad's two fingers: over the shelf, the tools; over the label, the kinds; else the camera, nearer or farther by a wheel's click or a pinch, round and up by a scroll. */
-  #wheel(g: Extract<Gesture, { type: "wheel" }>, target: PlayTarget) {
-    const hit = target.hudAt(g.x, g.y);
-    if (hit) {
-      // A step for each click of a mouse wheel, or each so much a trackpad scrolls (with its momentum, dozens of small events); a pinch or a sideways scroll over them, nothing.
-      if (g.zoom || g.dy === 0) return;
-      const shelf = this.#shelf;
-      const now = this.#now();
-      if (now - shelf.at > SHELF_IDLE) shelf.scrolled = 0;
-      shelf.at = now;
-      shelf.scrolled += g.notch ? Math.sign(g.dy) * SHELF_SCROLL : g.dy;
-      if (Math.abs(shelf.scrolled) < SHELF_SCROLL) return;
-      const dir = shelf.scrolled > 0 ? 1 : -1;
-      shelf.scrolled = 0;
-      if (hit.kind === HUD_HITS.tool) target.stepTool(dir);
-      else if (hit.kind === HUD_HITS.kind || hit.kind === HUD_HITS.label) target.stepKind(dir, hit.index as Dial);
-      return;
-    }
-    if (g.zoom) target.zoom(Math.exp(g.dy * PINCH_ZOOM));
-    else if (g.notch) target.zoom(Math.pow(NOTCH_ZOOM, Math.sign(g.dy)));
-    // The page's content follows the fingers, so the camera turns as a drag the same way would.
-    else target.turn(g.dx * SCROLL_ROUND, -g.dy * SCROLL_UP);
   }
 }
