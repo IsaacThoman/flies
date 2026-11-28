@@ -106,8 +106,9 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | The menu | The round button at the bottom left. | The round button at the top left. |
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
-Back, the space bar for Play/Pause), its hints drawn as keys; Tab opens the
-tray too, + and − held bring the camera in and take it out, Q and E held turn
+Back, the space bar for Play/Pause), its hints drawn as keys; in play Tab opens
+the tray too (elsewhere, and always with the page's controls for a screen
+reader, it moves the browser's focus as ever), + and − held bring the camera in and take it out, Q and E held turn
 it round the fly (on Why?, go back and forth through it), W and S up and down,
 and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was

@@ -174,6 +174,24 @@ test("a keyboard's own keys: Tab opens the tray, R or Home takes the camera back
   assert.deepEqual(keyboard.actions, [{ kind: "home" }], "once, and never with the browser's own shortcuts");
 });
 
+test("Tab opens the tray only when it is the tray's: elsewhere the browser keeps it, to move focus, unprevented", () => {
+  const devices = new Devices("mouse");
+  const target = new EventTarget();
+  const remote = new Remote(target as unknown as Window, () => 1, devices, "keys");
+  let playing = false;
+  const keyboard = new Keyboard(target as unknown as Window, remote, devices, () => 7, () => playing);
+  const tab = () => {
+    let prevented = false;
+    target.dispatchEvent(Object.assign(new Event("keydown"), { code: "Tab", key: "Tab", repeat: false, preventDefault: () => (prevented = true) }));
+    return prevented;
+  };
+  assert.equal(tab(), false);
+  assert.deepEqual(keyboard.actions, []);
+  playing = true;
+  assert.equal(tab(), true);
+  assert.deepEqual(keyboard.actions, [{ kind: "tray" }]);
+});
+
 test("a second tap or click soon after the first, in the same place, is a double one; a third starts again", () => {
   const { pointers, raw, tick } = rig();
   const tapAt = (x: number) => {

@@ -517,11 +517,13 @@ export class Keyboard {
   tilt = 0;
   zoom = 0;
 
-  constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
+  /** `trayKey`: whether Tab is the tray's now (in play), rather than the browser's, which moves focus (the menus, and the page's own controls for a screen reader). */
+  constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now(), trayKey: () => boolean = () => true) {
     target.addEventListener("keydown", (event) => {
       const e = event as KeyboardEvent;
       if (e.ctrlKey || e.metaKey || e.altKey || (e.repeat && !this.#held.has(e.code))) return;
       const action = keyAction(e.code, e.key);
+      if (action?.kind === "tray" && !trayKey()) return;
       const axis = action ? null : keyAxis(e.code, e.key);
       if (!action && !axis) return;
       e.preventDefault?.();
