@@ -367,3 +367,17 @@ test("a fly in the air over its skin, landing on it or taking off, never lifts t
   }
   assert.equal(finger.tip.y, 0, `the finger rose to ${finger.tip.y}`);
 });
+
+test("put down before it has come in (the empty hand held still on the table), it comes in down and stays down; put away and taken again, it comes in raised", () => {
+  const world = new World(bare);
+  const finger = new Finger(world);
+  const pointer = { x: 0, y: 0, z: 0 };
+  const fly = { x: 0, y: 0, z: -100 };
+  finger.putDown();
+  for (let i = 0; i < 600; i++) finger.update(DT, true, pointer, fly, []);
+  assert.equal(finger.state, "down");
+  assert.equal(finger.tip.y, 0, "down on the table");
+  finger.clear();
+  finger.update(DT, true, pointer, fly, []);
+  assert.equal(finger.state, "raised");
+});

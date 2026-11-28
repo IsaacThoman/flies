@@ -91,8 +91,8 @@ type Grip =
   | { kind: "press"; x: number; y: number; at: number }
   /** Holding a held tool on the table, or the empty hand on the fly. */
   | { kind: "tool" }
-  /** Down on the table with a placed tool: a drag carries it, and a tap puts it down or lifts it. */
-  | { kind: "place" }
+  /** Down on the table with a placed tool: a drag carries it, and a tap puts it down or lifts it (`tap`; not when the press itself put it down). */
+  | { kind: "place"; tap: boolean }
   /** A piece the empty hand took up: a drag carries it, and where it is let go it is set down. */
   | { kind: "carry" }
   /** Turning the camera. */
@@ -149,7 +149,8 @@ export class PlayControls {
     const grip = this.#grip;
     if (grip?.kind !== "press" || target.tool() !== "hand" || this.#now() - grip.at < LONG_PRESS) return;
     target.offerFinger();
-    this.#grip = { kind: "place" };
+    // Already down: letting go leaves it there.
+    this.#grip = { kind: "place", tap: false };
   }
 
   gesture(g: Gesture, target: PlayTarget, mouse: boolean) {
@@ -190,7 +191,7 @@ export class PlayControls {
         const tool = target.tool();
         if (!onWorld) this.#turn(g.x, g.y, target);
         else if (tool === "hold") this.#grip = { kind: "tool" };
-        else if (tool === "place") this.#grip = { kind: "place" };
+        else if (tool === "place") this.#grip = { kind: "place", tap: true };
         else if (tool === "hand") {
           const under = target.under();
           if (under === "fly") this.#grip = { kind: "tool" };
@@ -228,7 +229,7 @@ export class PlayControls {
         } else if (grip.kind === "tool") {
           if (!mouse) target.unaim();
         } else if (grip.kind === "place") {
-          if (g.tap && !target.hudAt(g.x, g.y)) target.use();
+          if (grip.tap && g.tap && !target.hudAt(g.x, g.y)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "carry") {
           // Carried and let go, it goes down there; let go over the buttons at the foot, it is put away. A tap only took it up: it stays in hand.

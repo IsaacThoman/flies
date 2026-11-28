@@ -2141,7 +2141,7 @@ export class Game implements Shell {
       grab: () => this.#grab(),
       offerFinger: () => {
         this.#take("finger");
-        this.finger.use();
+        this.finger.putDown();
         this.#learn("finger");
       },
       putAway: () => this.#putAway(),

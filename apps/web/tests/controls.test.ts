@@ -243,9 +243,15 @@ test("the empty hand held still on the table puts the fingertip down there; move
   still.tick(20);
   still.controls.tick(still.target);
   assert.deepEqual(still.asked, ["aim", "finger"]);
-  // Now the fingertip, a drag carries it.
+  // Now the fingertip, down: a drag carries it, and letting go, even without moving, leaves it down.
   still.send(false, drag(0.6, 0.6), up(0.6, 0.6, false));
   assert.deepEqual(still.asked.slice(2), ["aim", "unaim"]);
+  const tapped0 = rig("hand");
+  tapped0.send(false, down(0.5, 0.6, 0, true));
+  tapped0.tick(LONG_PRESS + 10);
+  tapped0.controls.tick(tapped0.target);
+  tapped0.send(false, up(0.5, 0.6));
+  assert.deepEqual(tapped0.asked, ["aim", "finger", "unaim"], "the long press's own release is not a tap that lifts it");
   const moved = rig("hand");
   moved.send(false, down(0.5, 0.6, 0, true), drag(0.6, 0.6));
   moved.tick(LONG_PRESS * 2);
