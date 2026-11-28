@@ -14,7 +14,6 @@ import { OVERLAY_SIZES, freshDay } from "../src/settings.ts";
 import type { OverlaySize, ShowWhen, StatsKind } from "../src/settings.ts";
 import { drawStatsPanel, statsLayout, statsSlot, statsWanted } from "../src/stats/panel.ts";
 import type { StatsLayout, StatsState } from "../src/stats/panel.ts";
-import { TOOLS } from "../src/tools/hands.ts";
 import { CORNERS, CORNER_HOLD, CornerDeck, CornerPlacement, waitFor } from "../src/ui/corners.ts";
 import type { CornerPicture, CornerWanted } from "../src/ui/corners.ts";
 import { hudLayout, safeRect } from "../src/ui/layout.ts";
@@ -221,8 +220,8 @@ test("at every shape, size and choice of stats, at every corner, they are inside
     const hud = hudLayout(frame, reserveHints);
     const a = safeRect(frame);
     const inside = (r: Rect) => r.x >= a.x - 1e-6 && r.y >= a.y - 1e-6 && r.x + r.width <= a.x + a.w + 1e-6 && r.y + r.height <= a.y + a.h + 1e-6;
-    const shelf = { x: hud.shelfLeft, y: hud.shelfY - 26, width: hud.gap * TOOLS.length + hud.apart, height: 52 };
-    const label = { x: hud.cx - 110, y: hud.labelY - 17, width: 220, height: 32 };
+    const shelf = { x: hud.footLeft, y: hud.labelY, width: hud.heldX + hud.sideGap + hud.sideR + 4 - hud.footLeft, height: hud.heldY + hud.heldR - hud.labelY };
+    const label = { x: hud.heldX - 70, y: hud.heldY - hud.heldR - 30, width: 140, height: 26 };
     const caption = { x: hud.cx - 70, y: hud.captionY - 15, width: 140, height: 30 };
     // The remote's chip for the menu is wider than the pointer's button.
     const menu = { x: hud.menuX, y: hud.menuY - 18, width: 90, height: 36 };

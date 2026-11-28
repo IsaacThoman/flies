@@ -13,9 +13,9 @@ import { BUILD_GRID, MAX_PIECES, World, covers, fits, isPieceKind, keepPieces, k
 import type { Piece, PieceKind, Place, Vec3 } from "@fly/world";
 import { loadBuilds, saveBuilds } from "../settings.ts";
 
-/** What the Build tool can do besides setting a piece down. */
-export type BuildAction = PieceKind | "turn" | "remove" | "clear";
-/** How near (mm) the hand must be to a piece to turn it or take it away. */
+/** What building does: sets a piece down, takes one up (the empty hand on it), or clears them all. */
+export type BuildAction = PieceKind | "remove" | "clear";
+/** How near (mm) the hand must be to a piece to take it up. */
 const TARGET_REACH = 1.5;
 /** Following the fly, a piece that doesn't fit just in front of it goes this much further out (mm) at a time, this far at most. */
 const NUDGE = BUILD_GRID;
@@ -26,10 +26,10 @@ type Foods = readonly { x: number; y: number; z: number; r: number }[];
 
 /** Where the next piece would go, or which piece the hand is on, as the view shows it. */
 export type Aim = {
-  /** A piece to set down (and where), one already down to turn or take away (`target`), or nothing. */
+  /** A piece to set down (and where), one already down to take up (`target`), or nothing. */
   readonly piece: Piece;
   showing: "piece" | "target" | "none";
-  /** It can go there now, or be turned or taken away. */
+  /** It can go there now, or be taken up. */
   ok: boolean;
   /** The piece the hand is on, or -1. */
   target: number;
@@ -103,7 +103,7 @@ export class Builder {
       aim.ok = this.pieces.length > 0;
       return aim;
     }
-    if (action === "turn" || action === "remove") {
+    if (action === "remove") {
       aim.target = pieceAt(this.pieces, at.x, at.y, at.z, TARGET_REACH);
       aim.showing = aim.target >= 0 ? "target" : "none";
       aim.ok = aim.target >= 0;
@@ -154,25 +154,13 @@ export class Builder {
     return rest !== null && fits(this.base, this.pieces, found) && !covers(found, flies, this.#place.start, foods) && !this.keepOut(found);
   }
 
-  /** Does what `point` last found: sets the piece down, turns it, takes it away, or clears them all. Whether it did. */
-  use(action: BuildAction, flies: Flies, foods: Foods): boolean {
+  /** Does what `point` last found: sets the piece down, takes it up, or clears them all. Whether it did. */
+  use(action: BuildAction): boolean {
     const aim = this.aim;
     if (!this.active || !aim.ok) return false;
     if (action === "clear") this.pieces = [];
     else if (action === "remove") this.pieces.splice(aim.target, 1);
-    else if (action === "turn") {
-      const piece = this.pieces[aim.target];
-      const turned: Piece = { ...piece };
-      // The next way round it fits, an eighth of a turn at a time.
-      let found = false;
-      for (let k = 1; k < 8 && !found; k++) {
-        turned.turns = (piece.turns + k) % 8;
-        found = fits(this.base, this.pieces, turned, aim.target) && !covers(turned, flies, this.#place.start, foods) && !this.keepOut(turned);
-      }
-      if (!found) return false;
-      this.pieces[aim.target] = turned;
-      this.turns = turned.turns;
-    } else this.pieces.push({ ...aim.piece });
+    else this.pieces.push({ ...aim.piece });
     this.#apply();
     this.#keep();
     return true;
@@ -189,9 +177,9 @@ export class Builder {
   }
 }
 
-/** The Build tool's kind, as what it does. */
-export function buildAction(variant: string): BuildAction | null {
-  return isPieceKind(variant) || variant === "turn" || variant === "remove" || variant === "clear" ? variant : null;
+/** The piece a Build kind sets down. */
+export function buildAction(variant: string): PieceKind | null {
+  return isPieceKind(variant) ? variant : null;
 }
 
 function copy(to: Piece, from: Readonly<Piece>) {

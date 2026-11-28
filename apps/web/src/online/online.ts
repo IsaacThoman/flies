@@ -664,8 +664,8 @@ export class Online {
         h.eyeX = player.eye.x;
         h.eyeY = player.eye.y;
         h.eyeZ = player.eye.z;
-        h.tool = toolToWire(hands.tool);
-        h.variant = hands.variants[hands.tool];
+        h.tool = toolToWire(hands.shownTool);
+        h.variant = hands.variants[hands.shownTool];
       }
       if (++n >= MAX_OWN) break;
     }

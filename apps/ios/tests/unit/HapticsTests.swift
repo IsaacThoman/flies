@@ -18,6 +18,7 @@ final class HapticsTests: XCTestCase {
   func testTheFeatherOnTheFlyTapsAsFirmlyAsItIsFelt() {
     XCTAssertEqual(feel(tool: "feather", touch: 0.4).feather, 0.4, "resting on it")
     XCTAssertEqual(feel(tool: "feather", touch: 1).feather, 1, "stroking it")
+    XCTAssertEqual(feel(tool: "hand", touch: 1).feather, 1, "the empty hand stroking it")
     XCTAssertNil(feel(tool: "feather", touch: 0.25).feather, "a raindrop while the feather is in hand")
     XCTAssertNil(feel(tool: "blow", touch: 0.4).feather, "a leaf brushing it, with another tool")
   }

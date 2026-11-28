@@ -1,41 +1,56 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Hit } from "@fly/ui";
-import { DRAG_ROUND, DRAG_UP, NOTCH_ZOOM, PlayControls } from "../src/controls.ts";
-import type { PlayTarget, ToolUse } from "../src/controls.ts";
+import { DRAG_ROUND, DRAG_UP, LONG_PRESS, NOTCH_ZOOM, PlayControls } from "../src/controls.ts";
+import type { PlayTarget, ToolUse, Under } from "../src/controls.ts";
 import type { Gesture } from "../src/input.ts";
 import { HUD_HITS } from "../src/ui/hud.ts";
 
 /**
- * A stand-in for the game: the bottom fifth of the screen is the shelf, the
- * top third is the air, the rest the table. It writes down what it is asked.
+ * A stand-in for the game: the bottom fifth of the screen is the button for
+ * what is in hand, the top third is the air, the rest the table; what the
+ * hand is on there is `under`. It writes down what it is asked.
  */
-function rig(tool: ToolUse = "once") {
+function rig(tool: ToolUse = "once", under: Under = "world") {
   const asked: string[] = [];
-  const shelf: Hit = { kind: HUD_HITS.tool, index: 2, value: 0, x: 0, y: 0, w: 0, h: 0 };
+  const held: Hit = { kind: HUD_HITS.held, index: 0, value: 0, x: 0, y: 0, w: 0, h: 0 };
+  let trayOpen = false;
   const target: PlayTarget = {
     tool: () => tool,
-    hudAt: (_x, y) => (y > 0.8 ? shelf : null),
+    hudAt: (_x, y) => (y > 0.8 ? held : null),
     aim: (_x, y, follow) => {
       asked.push(`aim${follow ? "" : " (hover)"}`);
       return y > 1 / 3;
     },
     unaim: () => asked.push("unaim"),
+    under: () => under,
     use: () => asked.push("use"),
+    grab: () => {
+      asked.push("grab");
+      return true;
+    },
+    offerFinger: () => asked.push("finger"),
+    putAway: () => asked.push("put away"),
     pressHud: (hit) => asked.push(`press ${hit.kind}`),
-    stepKind: (dir) => asked.push(`kind ${dir}`),
-    stepTool: (dir) => asked.push(`tool ${dir}`),
+    trayOpen: () => trayOpen,
+    closeTray: () => {
+      trayOpen = false;
+      asked.push("close tray");
+    },
+    hoverHud: (hit) => {
+      if (hit) asked.push(`over ${hit.kind}`);
+    },
     turn: (yaw, pitch) => asked.push(`turn ${yaw.toFixed(2)} ${pitch.toFixed(2)}`),
     zoom: (factor) => asked.push(`zoom ${factor.toFixed(3)}`),
     holdCamera: (held) => asked.push(held ? "hold" : "let go"),
     home: () => asked.push("home"),
   };
   let now = 0;
-  const controls = new PlayControls(() => ({ width: 800, height: 450 }), () => now);
+  const controls = new PlayControls(() => now);
   const send = (mouse: boolean, ...gestures: Gesture[]) => {
     for (const g of gestures) controls.gesture(g, target, mouse);
   };
-  return { asked, target, controls, send, tick: (ms: number) => (now += ms) };
+  return { asked, target, controls, send, tick: (ms: number) => (now += ms), open: () => (trayOpen = true) };
 }
 const down = (x: number, y: number, button = 0, touch = false): Gesture => ({ type: "down", x, y, button, touch });
 const drag = (x: number, y: number, far = true): Gesture => ({ type: "drag", x, y, far });
@@ -100,22 +115,16 @@ test("a double click or tap in the air takes the camera back to Follow", () => {
   assert.ok(asked.includes("home"));
 });
 
-test("a trackpad: a pinch brings the camera in or out, and a scroll turns it round and up as a drag would; over the shelf the wheel and the trackpad step the tools", () => {
-  const { asked, send, tick } = rig();
+test("a trackpad: a pinch brings the camera in or out, and a scroll turns it round and up as a drag would; over the HUD or the open tray the wheel does nothing", () => {
+  const { asked, send, open } = rig();
   send(true, wheel(-6, false, true), wheel(0, false, false, 30), wheel(-30, false), wheel(20, false));
   assert.ok(asked[0].startsWith("zoom 0.9"), `a pinch out brings it in: ${asked}`);
   assert.deepEqual(asked.slice(1), ["turn 0.18 0.00", "turn 0.00 0.10", "turn 0.00 -0.06"], "across: round; fingers down (the content scrolled up): higher, as a drag down; and back");
   asked.length = 0;
-  const overShelf: Gesture = { type: "wheel", x: 0.5, y: 0.9, dx: 0, dy: 100, notch: true, zoom: false };
-  send(true, overShelf);
-  assert.deepEqual(asked, ["tool 1"]);
-  asked.length = 0;
-  // A trackpad's small steps over the shelf add up to a tool; left alone, they start again.
-  for (let i = 0; i < 5; i++) send(true, { ...overShelf, dy: 20, notch: false });
+  send(true, { type: "wheel", x: 0.5, y: 0.9, dx: 0, dy: 100, notch: true, zoom: false });
+  open();
+  send(true, wheel(100, true));
   assert.deepEqual(asked, []);
-  tick(400);
-  for (let i = 0; i < 7; i++) send(true, { ...overShelf, dy: 20, notch: false });
-  assert.deepEqual(asked, ["tool 1"]);
 });
 
 test("each click of a mouse wheel is the same step in or out, and nothing else", () => {
@@ -138,10 +147,10 @@ test("two fingers: spread brings the camera in, moved together they turn it; a f
   assert.deepEqual(asked, ["aim", "unaim", "hold", "let go", "unaim", "zoom 0.500", `turn ${(-0.1 * DRAG_ROUND).toFixed(2)} 0.00`]);
 });
 
-test("a tap on the shelf presses it; a press the game spent does nothing more until it lifts", () => {
+test("a tap on the button at the foot presses it; a press the game spent does nothing more until it lifts", () => {
   const { asked, send, controls } = rig();
   send(false, down(0.5, 0.9, 0, true), up(0.5, 0.9));
-  assert.deepEqual(asked, ["press tool"]);
+  assert.deepEqual(asked, ["press held"]);
   asked.length = 0;
   send(false, down(0.5, 0.6, 0, true));
   controls.spend();
@@ -150,54 +159,29 @@ test("a tap on the shelf presses it; a press the game spent does nothing more un
   assert.equal(controls.pressed, false);
 });
 
-test("a mouse hovering puts the hand under it, but not over the shelf", () => {
+test("a mouse hovering puts the hand under it, but not over the HUD, which it lights", () => {
   const { asked, send } = rig();
   send(true, { type: "hover", x: 0.5, y: 0.5 }, { type: "hover", x: 0.5, y: 0.9 });
-  assert.deepEqual(asked, ["aim", "aim (hover)"]);
+  assert.deepEqual(asked, ["aim", "over held", "aim (hover)"]);
   asked.length = 0;
   send(false, { type: "hover", x: 0.5, y: 0.5 });
   assert.deepEqual(asked, [], "a finger doesn't hover");
 });
 
 
-test("tool names preview on hover or touch without selecting until a tap completes", () => {
-  const { controls, send, asked } = rig();
-  send(true, { type: "hover", x: 0.5, y: 0.9 });
-  assert.equal(controls.previewTool, 2);
-  assert.ok(!asked.includes("press tool"));
-  send(true, { type: "leave" });
-  assert.equal(controls.previewTool, -1);
-  asked.length = 0;
-  send(false, down(0.5, 0.9, 0, true));
-  assert.equal(controls.previewTool, 2);
-  assert.deepEqual(asked, []);
-  send(false, up(0.5, 0.9));
-  assert.deepEqual(asked, ["press tool"]);
-  assert.equal(controls.previewTool, -1);
-  send(false, down(0.5, 0.9, 0, true), { type: "cancel" });
-  assert.equal(controls.previewTool, -1);
-});
-
 test("a release over another HUD target cancels, including a boundary crossed within tap slop", () => {
   const { target, send, asked } = rig();
-  target.hudAt = (x) => ({ kind: HUD_HITS.tool, index: x < 0.5 ? 0 : 1, value: 0, x: 0, y: 0, w: 1, h: 1 });
+  target.hudAt = (x) => ({ kind: HUD_HITS.slot, index: x < 0.5 ? 0 : 1, value: 0, x: 0, y: 0, w: 1, h: 1 });
   send(false, down(0.499, 0.9, 0, true), up(0.501, 0.9));
   assert.deepEqual(asked, []);
   send(false, down(0.4, 0.9, 0, true), up(0.4, 0.9));
-  assert.deepEqual(asked, ["press tool"]);
+  assert.deepEqual(asked, ["press slot"]);
 });
 
 test("a non-tap release cannot use a one-shot tool when its final move was lost", () => {
   const { send, asked } = rig();
   send(false, down(0.5, 0.6, 0, true), up(0.7, 0.6, false));
   assert.deepEqual(asked, ["aim", "unaim"]);
-});
-
-test("a predominantly vertical drag across a label cannot step its kind", () => {
-  const { target, send, asked } = rig();
-  target.hudAt = () => ({ kind: HUD_HITS.label, index: 0, value: 1, x: 0, y: 0, w: 1, h: 1 });
-  send(false, down(0.4, 0.7, 0, true), drag(0.46, 0.9), up(0.46, 0.9, false));
-  assert.deepEqual(asked, []);
 });
 
 test("a world press released over the HUD cannot drop food underneath it", () => {
@@ -210,12 +194,12 @@ test("HUD press feedback previews an eligible target and clears without acting o
   const { controls, target, send, asked } = rig();
   const preview = () => controls.preview?.kind ?? null;
   send(false, down(0.5, 0.81, 0, true));
-  assert.equal(preview(), HUD_HITS.tool);
+  assert.equal(preview(), HUD_HITS.held);
   assert.equal(asked.length, 0);
   send(false, drag(0.5, 0.799, false));
   assert.equal(preview(), null, "outside the target clears its preview");
   send(false, drag(0.5, 0.81, false));
-  assert.equal(preview(), HUD_HITS.tool, "returning within tap slop can re-arm it");
+  assert.equal(preview(), HUD_HITS.held, "returning within tap slop can re-arm it");
   send(false, drag(0.5, 0.7, true), drag(0.5, 0.81, true));
   assert.equal(preview(), null, "a drag stays cancelled on returning");
   send(false, up(0.5, 0.81, false));
@@ -224,7 +208,58 @@ test("HUD press feedback previews an eligible target and clears without acting o
   assert.equal(preview(), null);
   assert.ok(!asked.some(a => a.startsWith("press")));
   controls.gesture(down(0.5, 0.9), target, true);
-  assert.equal(preview(), HUD_HITS.tool, "mouse has the same feedback");
+  assert.equal(preview(), HUD_HITS.held, "mouse has the same feedback");
   controls.spend();
   assert.equal(preview(), null);
+});
+
+test("the empty hand on the fly strokes it while it is held, and a drag keeps stroking where it goes", () => {
+  const { asked, send, controls } = rig("hand", "fly");
+  send(false, down(0.5, 0.6, 0, true));
+  assert.equal(controls.holding, true);
+  send(false, drag(0.52, 0.6), up(0.52, 0.6, false));
+  assert.deepEqual(asked, ["aim", "aim", "unaim"]);
+  assert.equal(controls.holding, false);
+});
+
+test("the empty hand on a piece takes it up: a drag carries it, and where it is let go it goes down; let go over the foot, it is put away; a tap only takes it up", () => {
+  const carried = rig("hand", "piece");
+  carried.send(true, down(0.5, 0.6), drag(0.6, 0.6), drag(0.7, 0.6), up(0.7, 0.6, false));
+  assert.deepEqual(carried.asked, ["aim", "grab", "aim", "aim", "aim", "use"]);
+  const away = rig("hand", "piece");
+  away.send(false, down(0.5, 0.6, 0, true), drag(0.5, 0.9), up(0.5, 0.9, false));
+  assert.ok(away.asked.includes("put away") && !away.asked.includes("use"), String(away.asked));
+  const tapped = rig("hand", "piece");
+  tapped.send(true, down(0.5, 0.6), up(0.5, 0.6));
+  assert.deepEqual(tapped.asked, ["aim", "grab"]);
+});
+
+test("the empty hand held still on the table puts the fingertip down there; moved, it turns the camera, and a tap does nothing", () => {
+  const still = rig("hand");
+  still.send(false, down(0.5, 0.6, 0, true));
+  still.tick(LONG_PRESS - 10);
+  still.controls.tick(still.target);
+  assert.deepEqual(still.asked, ["aim"]);
+  still.tick(20);
+  still.controls.tick(still.target);
+  assert.deepEqual(still.asked, ["aim", "finger"]);
+  // Now the fingertip, a drag carries it.
+  still.send(false, drag(0.6, 0.6), up(0.6, 0.6, false));
+  assert.deepEqual(still.asked.slice(2), ["aim", "unaim"]);
+  const moved = rig("hand");
+  moved.send(false, down(0.5, 0.6, 0, true), drag(0.6, 0.6));
+  moved.tick(LONG_PRESS * 2);
+  moved.controls.tick(moved.target);
+  assert.ok(!moved.asked.includes("finger") && moved.asked.includes("hold"));
+  const tapped = rig("hand");
+  tapped.send(true, down(0.5, 0.6), up(0.5, 0.6));
+  assert.deepEqual(tapped.asked, ["aim"]);
+});
+
+test("with the tray open a press anywhere but on it closes it and does nothing more until it lifts", () => {
+  const { asked, send, open, controls } = rig("once");
+  open();
+  send(false, down(0.5, 0.6, 0, true), drag(0.7, 0.6), up(0.7, 0.6, false));
+  assert.deepEqual(asked, ["close tray"]);
+  assert.equal(controls.pressed, false);
 });

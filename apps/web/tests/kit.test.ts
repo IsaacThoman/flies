@@ -13,6 +13,7 @@ import { WeatherNow } from "../src/scene/weather.ts";
 import { Builder } from "../src/tools/build.ts";
 import type { BuildAction } from "../src/tools/build.ts";
 import { TOOLS } from "../src/tools/hands.ts";
+import { TRAY } from "../src/tools/tray.ts";
 import { picnic } from "../src/places/picnic/index.ts";
 
 /** An open stretch of the picnic table, toward the lake. */
@@ -27,14 +28,15 @@ function setup(saved: Record<string, unknown> = {}) {
   const at = (action: BuildAction, x: number, z: number, following = false, fly = FLY) => builder.point(action, { x, y: world.heightAt(x, z), z }, following, fly, [fly], []);
   const build = (action: BuildAction, x: number, z: number, following = false, fly = FLY) => {
     at(action, x, z, following, fly);
-    return builder.use(action, [fly], []);
+    return builder.use(action);
   };
   return { world, builder, kept, at, build };
 }
 
-test("the Build tool's kinds are the kit's pieces, then turning, taking away and clearing", () => {
+test("the Build tool's kinds are the kit's pieces, and the tray's Build ring has each of them", () => {
   const tool = TOOLS.find((t) => t.id === "build")!;
-  assert.deepEqual(tool.variants.map((v) => v.id), [...PIECE_KINDS, "turn", "remove", "clear"]);
+  assert.deepEqual(tool.variants.map((v) => v.id), [...PIECE_KINDS]);
+  assert.deepEqual(TRAY.build.map((item) => item.id), [...PIECE_KINDS]);
 });
 
 test("a piece goes down where the hand is, on the grid, into the world the fly meets", () => {
@@ -60,15 +62,13 @@ test("following the fly, a piece that has no room just in front of it goes on ou
   assert.equal(build("tile-red", -40, -185, false, fly), false);
 });
 
-test("Turn turns the piece under the hand an eighth at a time, and later pieces go down that way; Take away and Clear take them away", () => {
+test("pieces go down turned as the one in hand is; the hand on one takes it up, and Clear takes them all away", () => {
   const { builder, build, world } = setup();
+  builder.turns = 2;
   build("wall", OPEN.x, OPEN.z);
-  assert.ok(build("turn", OPEN.x + 5, OPEN.z));
-  assert.equal(builder.pieces[0].turns, 1);
-  assert.ok(build("turn", OPEN.x, OPEN.z + 0.3));
   assert.equal(builder.pieces[0].turns, 2);
-  // Along z now: the hand where its end was is on nothing.
-  assert.equal(build("turn", OPEN.x + 9, OPEN.z), false);
+  // Along z now: the hand where its end would have been is on nothing.
+  assert.equal(build("remove", OPEN.x + 9, OPEN.z), false);
   build("wall", OPEN.x + 30, OPEN.z);
   assert.equal(builder.pieces[1].turns, 2);
   assert.equal(build("remove", OPEN.x + 50, OPEN.z), false, "nothing there");
@@ -119,7 +119,7 @@ test("the pieces are drawn in two draws however many there are, and a ghost only
   const view = new KitView(scene);
   const light = new Daylight("noon", picnic.palettes);
   const weather = new WeatherNow();
-  view.update(builder, null, false, 1, 0, light, weather, true);
+  view.update(builder, null, 1, 0, light, weather, true);
   const drawn = () => {
     const meshes: THREE.Object3D[] = [];
     scene.traverseVisible((o) => {
@@ -129,10 +129,10 @@ test("the pieces are drawn in two draws however many there are, and a ghost only
   };
   assert.equal(drawn(), 2);
   const aim = builder.point("crumb", { x: 0, y: 0, z: -230 }, false, FLY, [FLY], []);
-  view.update(builder, aim, false, 1, 0, light, weather, true);
+  view.update(builder, aim, 1, 0, light, weather, true);
   assert.equal(drawn(), 3);
   builder.setActive(false);
-  view.update(builder, null, false, 1, 0, light, weather, true);
+  view.update(builder, null, 1, 0, light, weather, true);
   assert.equal(drawn(), 0);
 });
 

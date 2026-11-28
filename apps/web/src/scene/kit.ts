@@ -336,7 +336,7 @@ export class KitView {
    * (`aim`, while `ghost` is shown, `opacity` faded with the hand). `outdoors`:
    * the place is in the open air, where rain and snow reach them.
    */
-  update(builder: Builder, aim: Aim | null, removing: boolean, opacity: number, time: number, light: Daylight, weather: Weather, outdoors: boolean) {
+  update(builder: Builder, aim: Aim | null, opacity: number, time: number, light: Daylight, weather: Weather, outdoors: boolean) {
     if (builder.version !== this.#version) {
       this.#version = builder.version;
       this.#rebuild(builder.active ? builder.pieces : []);
@@ -360,9 +360,9 @@ export class KitView {
     const target = aim.showing === "target";
     ghost.position.set(p.x, p.y, p.z);
     ghost.quaternion.setFromAxisAngle(UP, pieceAngle(p));
-    // The piece the hand is on, a little larger than it, so it glows over it.
+    // The piece the empty hand is on, a little larger than it, so it glows over it: it can be taken up.
     ghost.scale.setScalar(target ? 1.05 : 1);
-    this.#ghostMaterial.color.copy(!aim.ok || (target && removing) ? GHOST_NO : GHOST_OK);
+    this.#ghostMaterial.color.copy(aim.ok ? GHOST_OK : GHOST_NO);
     this.#ghostMaterial.opacity = opacity * (0.42 + 0.08 * Math.sin(time * 4));
   }
 

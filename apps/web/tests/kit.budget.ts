@@ -53,7 +53,7 @@ function built(full: boolean) {
       builder.turns = (k * 3) % 8;
       const at = { x: start.x + Math.cos(a) * ring * 11, y: 0, z: start.z + Math.sin(a) * ring * 11 };
       builder.point(kind, at, false, far, [far], []);
-      builder.use(kind, [far], []);
+      builder.use(kind);
     }
   }
   return { world, builder };
@@ -85,7 +85,7 @@ function kit(full: boolean) {
     hand.z = p.z + Math.cos(life.body.yaw) * 4;
     hand.y = world.heightAt(hand.x, hand.z, p.y + 0.9);
     const aim = builder.point("tile-blue", hand, true, p, flies, life.pantry.foods);
-    view.update(builder, aim, false, 1, now / 1000, light, weather, true);
+    view.update(builder, aim, 1, now / 1000, light, weather, true);
   };
   let at = 0;
   for (; at < 300; at++) frame(at * 16);

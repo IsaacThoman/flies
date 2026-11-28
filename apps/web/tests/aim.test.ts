@@ -47,13 +47,14 @@ test("a pointer beside the fly, or anywhere else, is on whatever is there", () =
   assert.equal(aimAt(world, sky.origin, sky.dir, fly, hit()), null, "the air over the table's edge is nothing");
 });
 
-test("play framing follows the room left by stacked or compact controls; on the TV, as ever", () => {
+test("play framing follows the room left over the foot; on the TV, as ever", () => {
   assert.deepEqual(playRoom(TV_FRAME), { lower: 0, wider: 1 });
-  const side = playRoom(frameFor(852, 393, { top: 0, right: 59, bottom: 21, left: 59 }, true));
-  const stacked = playRoom(frameFor(852, 393, { top: 0, right: 59, bottom: 21, left: 59 }, false));
-  assert.ok(stacked.lower < -0.1 && stacked.wider > 1.1, JSON.stringify(stacked));
-  assert.ok(Math.abs(side.lower) < 0.05 && side.wider > 1 && side.wider < stacked.wider, JSON.stringify(side));
+  // On its side, the foot takes more of a short screen: the fly rises and is drawn a little smaller, a finger's foot more so.
+  const mouse = playRoom(frameFor(852, 393, { top: 0, right: 59, bottom: 21, left: 59 }, false));
+  const finger = playRoom(frameFor(852, 393, { top: 0, right: 59, bottom: 21, left: 59 }, true));
+  assert.ok(mouse.lower < -0.05 && mouse.wider > 1 && mouse.wider < 1.15, JSON.stringify(mouse));
+  assert.ok(finger.lower < mouse.lower && finger.wider > mouse.wider && finger.wider < 1.2, JSON.stringify(finger));
+  // Upright, the foot is a small share of the height: about as on the TV.
   const upright = playRoom(frameFor(393, 852, { top: 59, right: 0, bottom: 34, left: 0 }, true));
-  // Upright, the shelf's groups are one over the other: a row more of the height under the fly.
-  assert.ok(Math.abs(upright.lower) < 0.15 && upright.wider < 1.1, JSON.stringify(upright));
+  assert.ok(Math.abs(upright.lower) < 0.1 && upright.wider < 1.1, JSON.stringify(upright));
 });

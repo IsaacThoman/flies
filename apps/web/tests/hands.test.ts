@@ -4,14 +4,16 @@ import { Pantry, World } from "@fly/world";
 import type { Place } from "@fly/world";
 import { DINER } from "../../../packages/world/tests/diner.ts";
 import { FLY_LENGTH, MOUTH_AHEAD } from "@fly/body";
-import { FEATHER_REACH, FEATHER_REST, POINTER_RETURN, PUFF_RADIUS, PUFF_SPEED, Hands, TOOLS, toolFromWire, toolToWire } from "../src/tools/hands.ts";
+import { FEATHER_REACH, FEATHER_REST, POINTER_RETURN, PUFF_RADIUS, PUFF_SPEED, Hands, TOOLS, toolFromWire, toolIndex, toolToWire } from "../src/tools/hands.ts";
 import { FINGER_HALF_WIDTH } from "../src/tools/finger.ts";
 
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
 
+/** Hands with Feed in hand (the empty hand is what a launch starts with). */
 function setup() {
   const world = new World(bare);
   const hands = new Hands(world);
+  hands.tool = toolIndex("feed");
   const pantry = new Pantry(world);
   const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
   const eye = { x: 0, y: 5, z: -10 };
@@ -73,7 +75,7 @@ test("frame end clears every hands event even when a pause skips the regular upd
   update(0.2);
   hands.chooseTool(TOOLS.findIndex((t) => t.id === "swoop"));
   update(0, true);
-  hands.chooseTool(0);
+  hands.chooseTool(toolIndex("feed"));
   hands.stepVariant(1);
   hands.stepVariant(-1);
   hands.stepVariant(-1);
@@ -105,6 +107,7 @@ test("food lands on what is under it, and the hands say where and which way it f
   const pantry = new Pantry(world);
   const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
   const eye = { x: 0, y: 5, z: -10 };
+  hands.tool = toolIndex("feed");
   hands.following = false;
   hands.pointer.x = 2;
   hands.pointer.y = 12;
@@ -166,8 +169,9 @@ for (const kind of ["coffee", "laced"] as const) {
     const world = new World(bare);
     const hands = new Hands(world);
     const pantry = new Pantry(world);
-    hands.variants[0] = TOOLS[0].variants.findIndex((v) => v.id === kind);
-    assert.ok(hands.variants[0] >= 0);
+    hands.tool = toolIndex("feed");
+    hands.variants[hands.tool] = hands.current.variants.findIndex((v) => v.id === kind);
+    assert.ok(hands.variants[hands.tool] >= 0);
     const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
     const eye = { x: 0, y: 5, z: -10 };
     hands.update(0, { use: true, holding: true, eye }, fly, pantry);
@@ -177,7 +181,7 @@ for (const kind of ["coffee", "laced"] as const) {
   });
 }
 
-test("Feed's Clear dropped kind removes offerings and falling food, leaving patches and finds", () => {
+test("clearing what was dropped removes offerings and falling food, leaving patches and finds", () => {
   const world = new World(bare);
   const hands = new Hands(world);
   const pantry = new Pantry(world, [{ name: "jam", x: 0, z: 0, r: 3, sweet: 1 }]);
@@ -186,17 +190,14 @@ test("Feed's Clear dropped kind removes offerings and falling food, leaving patc
   pantry.drop("honey", 0, 0);
   pantry.drop("water", 10, 0);
   hands.falling.push({ kind: "sugar", x: 0, z: 0, y: 10, floor: 0, vy: 0 });
-  hands.variants[0] = TOOLS[0].variants.findIndex((v) => v.id === "clear");
-  assert.ok(hands.variants[0] >= 0, "clear is selectable through the usual kind controls");
   const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
   const eye = { x: 0, y: 5, z: 10 };
-  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  hands.clearDropped(pantry);
   hands.update(1, { use: false, holding: false, eye }, fly, pantry);
   assert.deepEqual(pantry.foods, [patch, found]);
   assert.equal(hands.falling.length, 0);
-  assert.equal(hands.events.dropped, null, "clear never tries to drop a food kind");
   assert.equal(hands.events.landed, null);
-  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  hands.clearDropped(pantry);
   assert.deepEqual(pantry.foods, [patch, found], "clearing an empty table is harmless");
 });
 
@@ -205,7 +206,7 @@ test("a tool travels to a table by a code of its own, not its place on the shelf
   assert.equal(new Set(codes).size, TOOLS.length, "each its own");
   for (let i = 0; i < TOOLS.length; i++) assert.equal(toolFromWire(codes[i]), i);
   // The codes released builds send keep their meaning (the Sky taking Light's and Weather's): an older device reads them as it always has.
-  for (const [code, id] of ["feed", "swoop", "feather", "blow", "sky", "sky", "view", "place", "finger", "build", "photo"].entries()) assert.equal(TOOLS[toolFromWire(code)].id, id);
+  for (const [code, id] of ["feed", "swoop", "feather", "blow", "sky", "sky", "view", "place", "finger", "build", "photo", "hand"].entries()) assert.equal(TOOLS[toolFromWire(code)].id, id);
   assert.equal(toolFromWire(200), -1);
 });
 
@@ -223,4 +224,26 @@ test("taken up while the hand waits by the fly, the fingertip comes to a spot ju
   fly.position.z = 30;
   for (let t = 0; t < POINTER_RETURN + 1; t += 0.5) hands.update(0.5, { use: false, holding: false, eye }, fly, pantry);
   assert.equal(hands.pointer.z, at);
+});
+
+test("the empty hand touches the fly only while it is held on it, then as the feather stroking, which is how it is drawn and sent", () => {
+  const world = new World(bare);
+  const hands = new Hands(world);
+  const pantry = new Pantry(world);
+  assert.equal(hands.current.id, "hand", "a launch starts with the hand empty");
+  const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  const eye = { x: 0, y: 5, z: -10 };
+  // Waiting by its mouth, within the feather's reach of it.
+  for (let i = 0; i < 30; i++) hands.update(1 / 30, { use: false, holding: false, eye }, fly, pantry);
+  assert.ok(Math.hypot(hands.pointer.x, hands.pointer.z) < FEATHER_REACH);
+  assert.equal(hands.stroke, 0, "an empty hand waiting by the fly never rests on it");
+  assert.equal(hands.shownTool, toolIndex("hand"));
+  hands.update(1 / 30, { use: false, holding: true, eye }, fly, pantry);
+  assert.equal(hands.stroke, 1);
+  assert.equal(hands.stroking, true);
+  assert.equal(hands.petting, true);
+  assert.equal(TOOLS[hands.shownTool].id, "feather", "drawn and sent as the feather");
+  hands.update(1 / 30, { use: false, holding: false, eye }, fly, pantry);
+  assert.equal(hands.stroke, 0);
+  assert.equal(hands.shownTool, toolIndex("hand"));
 });

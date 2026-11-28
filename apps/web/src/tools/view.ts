@@ -66,6 +66,38 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: num
   g.lineCap = "round";
   g.lineJoin = "round";
   switch (tool) {
+    case "hand": {
+      // An open hand, palm toward us, fingers up.
+      g.fillStyle = "#f2b79c";
+      g.strokeStyle = "#b8604a";
+      g.lineWidth = r * 0.08;
+      // Each finger's middle across and its tip, as shares of r.
+      const fingers = [[-0.42, -0.42], [-0.15, -0.6], [0.13, -0.58], [0.4, -0.42]];
+      for (const [fx, fy] of fingers) {
+        g.beginPath();
+        g.moveTo(fx * r - r * 0.12, r * 0.05);
+        g.lineTo(fx * r - r * 0.12, (fy + 0.12) * r);
+        g.arc(fx * r, (fy + 0.12) * r, r * 0.12, Math.PI, 0);
+        g.lineTo(fx * r + r * 0.12, r * 0.05);
+        g.fill();
+        g.stroke();
+      }
+      g.beginPath();
+      g.moveTo(-r * 0.56, -r * 0.05);
+      g.quadraticCurveTo(-r * 0.6, r * 0.75, 0, r * 0.82);
+      g.quadraticCurveTo(r * 0.55, r * 0.78, r * 0.55, -r * 0.05);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      // The thumb, out to the right.
+      g.beginPath();
+      g.moveTo(r * 0.45, r * 0.3);
+      g.quadraticCurveTo(r * 0.82, r * 0.05, r * 0.85, -r * 0.22);
+      g.quadraticCurveTo(r * 0.72, -r * 0.3, r * 0.55, -r * 0.05);
+      g.fill();
+      g.stroke();
+      break;
+    }
     case "feed": {
       // A sugar cube and a drop of honey.
       g.fillStyle = "#ffffff";
@@ -583,7 +615,7 @@ export class HandsView {
       const out = size * 1.35 * this.#iconSide;
       icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
       // The feather and the fingertip are in the world themselves.
-      icon.visible = this.icon && id !== "feather" && id !== "finger";
+      icon.visible = this.icon && id !== "feather" && id !== "finger" && id !== "hand";
     } else this.#icon.visible = false;
 
     // Food landing leaves the ring's impression, spreading and fading where it fell.
@@ -634,7 +666,7 @@ export class HandsView {
     }
 
     const feather = this.#feather;
-    feather.visible = showPointer && hands.current.id === "feather";
+    feather.visible = showPointer && TOOLS[hands.shownTool].id === "feather";
     if (feather.visible) {
       // Leaning back toward the camera, swaying; stroking, it brushes to and fro.
       const wiggle = hands.stroking ? Math.sin(time * 14) * 0.5 : Math.sin(time * 2) * 0.12;

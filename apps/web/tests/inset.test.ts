@@ -7,24 +7,23 @@ import { TV_DESIGN_HEIGHT as DESIGN_HEIGHT, TV_DESIGN_WIDTH as DESIGN_WIDTH, TV_
 import { TV_FRAME } from "../src/display.ts";
 import { INSET_PICTURE, insetLayout, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
 import { CORNERS } from "../src/ui/corners.ts";
-import { TOOLS } from "../src/tools/hands.ts";
 import { hudLayout, safeRect } from "../src/ui/layout.ts";
 import { frames } from "./shapes.ts";
 import { DEFAULT_SETTINGS, loadSettings } from "../src/settings.ts";
 
 type Rect = { x: number; y: number; width: number; height: number };
 const TV_HUD = hudLayout(TV_FRAME);
-/** The shelf's glass on the TV, both halves. */
-const SHELF = { x: TV_HUD.shelfLeft - 8, y: TV_HUD.shelfY - 26, width: TV_HUD.gap * TOOLS.length + TV_HUD.apart + 16, height: 52 };
+/** What is along the foot on the TV: the button for what is in hand, and those either side of it. */
+const SHELF = { x: TV_HUD.footLeft, y: TV_HUD.labelY, width: TV_HUD.heldX + TV_HUD.sideGap + TV_HUD.sideR + 4 - TV_HUD.footLeft, height: TV_HUD.heldY + TV_HUD.heldR - TV_HUD.labelY };
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /** Where the HUD draws (ui/hud.ts), in design units, generously: the widest caption, label and hints. */
 const HUD = {
   caption: { x: DESIGN_WIDTH / 2 - 120, y: 8, width: 240, height: 36 },
   menuHint: { x: 12, y: 10, width: 100, height: 30 },
-  // With the tool chosen standing up out of it.
-  shelf: { x: SHELF.x, y: SHELF.y - 8, width: SHELF.width, height: SHELF.height + 8 },
-  toolLabel: { x: DESIGN_WIDTH / 2 - 140, y: 360, width: 280, height: 44 },
+  shelf: SHELF,
+  // The name of what is in hand, for a moment over it.
+  toolLabel: { x: DESIGN_WIDTH / 2 - 70, y: TV_HUD.heldY - TV_HUD.heldR - 30, width: 140, height: 26 },
   leftHints: { x: 12, y: 362, width: 210, height: 100 },
   swipeHint: { x: DESIGN_WIDTH - 230, y: 430, width: 230, height: 30 },
   stats: { x: DESIGN_WIDTH - 320, y: 458, width: 320, height: 20 },
@@ -97,8 +96,8 @@ test("at every shape each corner is inside the safe area and clear of the captio
     const hud = hudLayout(frame);
     const layout = insetLayout(frame, hud);
     const a = safeRect(frame);
-    const shelf = { x: hud.shelfLeft, y: hud.shelfY - 26, width: hud.gap * TOOLS.length + hud.apart, height: 52 };
-    const label = { x: hud.cx - 110, y: hud.labelY - 17, width: 220, height: 32 };
+    const shelf = { x: hud.footLeft, y: hud.labelY, width: hud.heldX + hud.sideGap + hud.sideR + 4 - hud.footLeft, height: hud.heldY + hud.heldR - hud.labelY };
+    const label = { x: hud.heldX - 70, y: hud.heldY - hud.heldR - 30, width: 140, height: 26 };
     const caption = { x: hud.cx - 70, y: hud.captionY - 15, width: 140, height: 30 };
     const menu = { x: hud.menuX, y: hud.menuY - 18, width: 36, height: 36 };
     for (const corner of CORNERS) {

@@ -210,7 +210,7 @@ test("no piece of the kit is built into the fingertip or onto it; beside it, or 
   finger.use();
   until(frame, () => finger.tip.y >= LIFT - 1e-6, 3);
   assert.equal(at(0, 50), true, "under it lifted");
-  assert.ok(builder.use("tile-blue", fly, []));
+  assert.ok(builder.use("tile-blue"));
   finger.use();
   until(frame, () => false, 3);
   assert.ok(Math.abs(finger.tip.y - 0.5) < 1e-6, `it rests on the tile at ${finger.tip.y}`);
@@ -233,7 +233,7 @@ test("pieces built or taken away while a fly stands on the finger don't drop it:
   // A tile elsewhere: the world is loaded again, the finger's solids after it.
   const fly = [body.position];
   assert.ok(builder.point("tile-red", { x: -60, y: 0, z: 0 }, false, body.position, fly, []).ok);
-  assert.ok(builder.use("tile-red", fly, []));
+  assert.ok(builder.use("tile-red"));
   finger.use();
   until(() => frame(true, rest), () => finger.tip.y >= LIFT - 1e-6, 3);
   assert.ok(finger.carries(body), "still on it");
