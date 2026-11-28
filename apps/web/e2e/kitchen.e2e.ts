@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import type { Browser } from "playwright";
 import {
   openGame,
@@ -8,7 +9,6 @@ import {
   waitForGameTime,
 } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
-import { PLACES } from "../src/places/catalog.ts";
 import { KINDS } from "../src/scene/weather.ts";
 
 const { url, server } = await startServer();
@@ -24,25 +24,7 @@ try {
     (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter =
       0;
   });
-  const press = async (key: string, count = 1) => {
-    for (let i = 0; i < count; i++) {
-      await page.keyboard.press(key);
-      await waitForGameTime(page, 0.12);
-    }
-  };
-  const tool = async (id:string)=>{
-    for(let i=0;i<12;i++) {
-      const at=(await readState(page)).tool;
-      if(at===id)return;
-      await page.keyboard.press("ArrowRight");
-      await waitFor(page,`tool~^(?!${at}$)`);
-    }
-    await waitFor(page,`tool=${id}`);
-  };
-  await tool("place");
-  const kitchen = PLACES.findIndex((p) => p.id === "kitchen");
-  await press("ArrowDown", kitchen);
-  await press("Enter");
+  await chooseFromTray(page, ["world", "place", "kitchen"]);
   const arrived = await waitFor(page, "place=kitchen,moving=");
   assert.equal(arrived.prints, "0");
   assert.equal(arrived.gl, "ok");
@@ -67,23 +49,15 @@ try {
       .sort(),
     ["honey", "orange juice", "orange juice", "peach juice"],
   );
-  await tool("view");
-  await press("ArrowDown", 2);
+  await chooseFromTray(page, ["look", "table"]);
   await waitFor(page, "view=table");
   const calls: number[] = [];
   const weathers = Object.keys(KINDS);
-  // The Sky: Up and Down for the time of day, Select round the weathers.
-  await tool("sky");
   for (const time of ["morning", "noon", "golden", "dusk", "night"]) {
-    await press("ArrowUp", 6);
-    await press(
-      "ArrowDown",
-      ["morning", "noon", "golden", "dusk", "night"].indexOf(time) + 1,
-    );
+    await chooseFromTray(page, ["world", "time", time]);
     await waitFor(page, `time=${time}`);
-    for (let i = 0; i < 10 && !(await readState(page)).sky.endsWith("/now"); i++) await press("Enter");
     for (const weather of weathers) {
-      await press("Enter");
+      await chooseFromTray(page, ["world", "weather", weather]);
       await waitFor(page, `weather=${weather}`);
       await waitForGameTime(page, 4);
       const s = await readState(page);
@@ -99,9 +73,7 @@ try {
   console.log(
     `kitchen: carried with remote, all food tastable, ${calls.length} light/weather combinations, median ${calls[Math.floor(calls.length / 2)]} draws`,
   );
-  await tool("place");
-  await press("ArrowUp", kitchen);
-  await press("Enter");
+  await chooseFromTray(page, ["world", "place", "picnic"]);
   await waitFor(page, "place=picnic,moving=");
 } finally {
   await browser?.close();

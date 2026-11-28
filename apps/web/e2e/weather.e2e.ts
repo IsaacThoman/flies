@@ -1,9 +1,9 @@
-// Exercises the weather shelf through the keyboard and the host's conditions
+// Exercises the weather tray through the keyboard and the host's conditions
 // through Outside, with the running brain and actual renderer.
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import { openGame, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
-import { TOOLS } from "../src/tools/hands.ts";
 
 const { url, server } = await startServer();
 let browser: Awaited<ReturnType<typeof openGame>>["browser"] | undefined;
@@ -15,27 +15,14 @@ try {
   await page.keyboard.press("Enter");
   await waitFor(page, "screen=play");
   await page.evaluate(() => { (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0; });
-  const sky = TOOLS.findIndex(t=>t.id==="sky");
-  for (let i=0;i<sky;i++) {
-    await page.keyboard.press("ArrowRight");
-    await waitForGameTime(page,0.2);
-  }
-  await waitFor(page,"tool=sky");
-  // Select steps the Sky's weather, round and round.
-  const choices = TOOLS[sky].second!;
-  let index = 0;
   for (const kind of ["clear","rain","heavyRain","storm","snow","sleet","overcast","mist","clear","now"]) {
-    const target = choices.findIndex(v=>v.id===kind);
-    while (index !== target) {
-      await page.keyboard.press("Enter");
-      index = (index + 1) % choices.length;
-      await waitFor(page,`sky~/${choices[index].id}$`);
-    }
+    await chooseFromTray(page, ["world", "weather", kind]);
+    await waitFor(page, `sky~/${kind}$`);
     if (kind !== "now") {
       await waitFor(page,`weather=${kind},weatherFrom=chosen`);
       await waitForGameTime(page,5);
     }
-    console.log("weather shelf:",kind);
+    console.log("weather tray:",kind);
   }
   for (const [condition,kind] of [["heavyRain","heavyRain"],["thunderstorms","storm"],["snow","snow"],["sleet","sleet"]]) {
     await page.evaluate(condition=>{

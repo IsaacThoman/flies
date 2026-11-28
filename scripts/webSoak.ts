@@ -18,8 +18,10 @@ import { PLACES } from "../apps/web/src/places/catalog.ts";
 import type { PlaceId } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
 import { WEATHERS } from "@fly/world";
-import { TOOLS } from "../apps/web/src/tools/hands.ts";
-import { chromiumPath, fullChromiumPath, gameUp, gpuFlags, readState, startServer, waitFor } from "./play.ts";
+import { TOOLS, toolIndex, toolToWire } from "../apps/web/src/tools/hands.ts";
+import type { ToolId } from "../apps/web/src/tools/hands.ts";
+import { chooseFromTray } from "../apps/web/e2e/tray.ts";
+import { chromiumPath, fullChromiumPath, gameUp, gpuFlags, readState, startServer, waitFor, waitForGameTime } from "./play.ts";
 
 declare global { var __fly: Game; }
 
@@ -104,16 +106,15 @@ async function move(page: Page, place: PlaceId) {
   await waitFor(page, `place=${place},moving=`, 60_000);
 }
 
-/** `dial`: which of the tool's dials (the Sky's second is its weather). */
-async function choose(page: Page, tool: string, variant: string, dial: 0 | 1 = 0) {
-  await page.evaluate(({ tool, variant, dial }) => {
-    const hands = globalThis.__fly.hands;
-    for (let i = 0; i < 12 && hands.current.id !== tool; i++) hands.stepTool(1);
-    while (hands.stepVariant(-1, false, dial)) { /* Start at the first choice, even after a previous phase. */ }
-    while (hands.variantOf(dial).id !== variant) if (!hands.stepVariant(1, false, dial)) throw Error(`No ${variant} on ${tool}`);
-  }, { tool, variant, dial });
-  await waitFor(page, dial === 1 ? `tool=${tool},sky~/${variant}$` : `tool=${tool},variant=${variant}`);
-  if (tool === "view") await page.evaluate(() => globalThis.__fly.play());
+/** The tray's path for each of the soak's tool variants and world settings. */
+async function choose(page: Page, tool: ToolId, variant: string, dial: 0 | 1 = 0) {
+  const path: Record<ToolId, readonly string[]> = {
+    hand: ["hand"], feed: ["food", variant], finger: ["finger"],
+    feather: ["toys", variant], blow: ["toys", variant], swoop: ["toys", variant],
+    build: ["build", variant], sky: ["world", dial === 1 ? "weather" : "time", variant],
+    place: ["world", "place", variant], view: ["look", variant], photo: ["photo"],
+  };
+  await chooseFromTray(page, path[tool]);
 }
 
 async function canonical(page: Page) {
@@ -136,6 +137,7 @@ async function canonical(page: Page) {
     g.settings.pixels = "classic";
     g.applySettings();
   });
+  await choose(page, "hand", "hand");
   await choose(page, "sky", "noon");
   await choose(page, "sky", "clear", 1);
   await choose(page, "view", "follow");
@@ -371,28 +373,47 @@ export async function run(args = process.argv.slice(2)) {
           }
         } else if (p === "tools") {
           for (const tool of TOOLS) for (const variant of tool.variants) {
+            if (tool.id === "place" && (await readState(page)).place === variant.id) continue;
             await choose(page, tool.id, variant.id);
-            await page.keyboard.press("Enter", { delay: tool.hold ? 400 : 40 });
             if (tool.id === "place") await waitFor(page, `place=${variant.id},moving=`);
+            else if (tool.id !== "sky" && tool.id !== "view") await page.keyboard.press("Enter", { delay: tool.hold ? 400 : 40 });
             await page.waitForTimeout(100);
             await sample();
           }
         } else if (p === "menus") {
-          await page.keyboard.press(" ");
+          await choose(page, "hand", "hand");
+          await choose(page, "view", "follow");
+          await page.keyboard.press("Escape");
           await waitFor(page, "screen=title");
           for (const screen of ["about", "settings", "online"] as const) {
             await page.evaluate((screen) => globalThis.__fly.open(screen), screen);
             await waitFor(page, `screen=${screen}`);
             if (screen === "settings") {
-              for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowUp");
-              for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
-              for (const tab of ["wallpaper", "screen", "picture"]) {
+              // Focus wraps around each settings page. Stop on the tabs instead of stepping past them.
+              for (let i = 0; i < 10; i++) {
+                const { focus } = await readState(page);
+                if (focus === "page") break;
+                await page.keyboard.press("ArrowUp");
+                await waitFor(page, `focus~^(?!${focus}$).+`);
+              }
+              await waitFor(page, "focus=page");
+              for (let i = 0; i < 2; i++) {
+                const { tab } = await readState(page);
+                if (tab === "wallpaper") break;
+                await page.keyboard.press("ArrowLeft");
+                await waitFor(page, `tab~^(?!${tab}$).+`);
+              }
+              for (const [tab, row] of [["wallpaper", "wallpaperAfter"], ["screen", "eyesInset"], ["picture", "pixels"]]) {
                 await waitFor(page, `tab=${tab},focus=page`);
                 await page.keyboard.press("ArrowDown");
+                await waitFor(page, `focus=${row}`);
                 await page.keyboard.press("ArrowRight");
+                await waitForGameTime(page, 0.1);
                 await page.keyboard.press("ArrowLeft");
+                await waitForGameTime(page, 0.1);
                 await sample(false, true);
                 await page.keyboard.press("ArrowUp");
+                await waitFor(page, "focus=page");
                 if (tab !== "picture") await page.keyboard.press("ArrowRight");
               }
             }
@@ -414,7 +435,7 @@ export async function run(args = process.argv.slice(2)) {
           try {
             const at = await page.evaluate(() => globalThis.__fly.life.body.position);
             peer.state.flags = HANDS | HOLDING | PLAYING;
-            Object.assign(peer.state.hand, { x: at.x, y: at.y, z: at.z, eyeX: at.x, eyeY: at.y + 10, eyeZ: at.z + 10, tool: TOOLS.findIndex((t) => t.id === "blow"), variant: 1 });
+            Object.assign(peer.state.hand, { x: at.x, y: at.y, z: at.z, eyeX: at.x, eyeY: at.y + 10, eyeZ: at.z + 10, tool: toolToWire(toolIndex("blow")), variant: 1 });
             await waitFor(page, `others~${peer.id}:1`, 30_000);
             // A posed fly's model; one far off is a stand-in, with none.
             assert.ok(await page.evaluate(() => globalThis.__fly.online!.others.list.every((o) => {
@@ -473,7 +494,7 @@ export async function run(args = process.argv.slice(2)) {
     }
   }
   try {
-    if (phases.includes("tables")) {
+    if (phases.includes("tables") || phases.includes("menus")) {
       rooms = await startRooms({ port: 0, dataDir: null, log: () => {} });
       const at = new URL(url);
       at.searchParams.set("rooms", `ws://127.0.0.1:${rooms.port}/rooms`);

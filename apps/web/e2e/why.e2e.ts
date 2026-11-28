@@ -1,6 +1,6 @@
 // Why? with the real brain in a real (GPU-rendered, headless) Chromium: throws
 // the ball until the fly takes off (its brain decides; it doesn't every time),
-// asks View for Why?, and checks on the canvas's state that the replay plays
+// chooses Why? from Look, and checks on the canvas's state that the replay plays
 // back the take-off with the giant fiber (DNp01) and the flight motor neurons
 // marked and a loom among the senses before it; that the remote's swipe, the
 // keys and the mouse move through it; and that leaving it is immediate while
@@ -11,10 +11,10 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
+import { chooseFromTray } from "./tray.ts";
 import type { ChildProcess } from "node:child_process";
 import { mouseDrag, openGame, readState, startServer, swipe, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
-import { TOOLS } from "../src/tools/hands.ts";
 
 const args = process.argv.slice(2);
 let url = args.includes("--url") ? args[args.indexOf("--url") + 1] : "";
@@ -33,10 +33,6 @@ const press = async (key: string) => {
   await page.keyboard.press(key);
   await waitForGameTime(page, 0.1);
 };
-const VIEW = TOOLS.findIndex((t) => t.id === "view");
-const WHY = TOOLS[VIEW].variants.findIndex((v) => v.id === "why");
-const SWOOP = TOOLS.findIndex((t) => t.id === "swoop");
-
 try {
   await waitFor(page, "brain=running,screen=title", 120_000);
   await page.keyboard.press("Enter");
@@ -53,7 +49,7 @@ try {
   });
   /** Throws the ball until the fly takes off, at most 16 times: the brain decides. */
   const startle = async () => {
-    await press(String(SWOOP + 1));
+    await chooseFromTray(page, ["toys", "ball"]);
     await waitFor(page, "tool=swoop");
     for (let throws = 1; throws <= 16; throws++) {
       await page.keyboard.press("Enter");
@@ -69,12 +65,8 @@ try {
     }
     assert.fail("the fly never took off");
   };
-  /** View → Why?: the number key takes the View tool, Down steps to its last kind. */
   const ask = async () => {
-    await press(String(VIEW + 1));
-    await waitFor(page, "tool=view");
-    const kind = (await readState(page)).variant;
-    for (let i = TOOLS[VIEW].variants.findIndex((v) => v.id === kind); i < WHY; i++) await press("ArrowDown");
+    await chooseFromTray(page, ["look", "why"]);
     return waitFor(page, "view=why,why~.");
   };
 
@@ -83,7 +75,7 @@ try {
   for (let tries = 1; tries <= 3; tries++) {
     console.log("· the ball until it takes off");
     await startle();
-    console.log("· View → Why? plays back the take-off");
+    console.log("· Look → Why? plays back the take-off");
     why = await ask();
     console.log(`  ${why.why}: neurons ${why.whyNeurons}, commands ${why.whyCommands}, senses before it ${why.whySenses || "none"}, regions ${why.whyRegions || "none"}`);
     assert.equal(why.why, "takeoff");
@@ -91,8 +83,8 @@ try {
     assert.equal(why.whyCommands, "escape,wings");
     if (/loom|lamina|medulla|lobula|visual-projection|optic/.test(`${why.whySenses} ${why.whyRegions}`)) break;
     // Asked again later: off Why? first, so that coming back to it takes what is kept then.
-    await press("ArrowUp");
-    await waitFor(page, "view=inside");
+    await press("Escape");
+    await waitFor(page, "view=follow");
   }
   assert.match(`${why.whySenses} ${why.whyRegions}`, /loom|lamina|medulla|lobula|visual-projection|optic/, "what its eyes took in rose before it");
   assert.equal(why.nerves, "hidden", "the corner pictures make way");
@@ -139,14 +131,14 @@ try {
   assert.ok((await fly()) > lived + 0.4, "the fly lives on while it is watched");
 
   console.log("· leaving it is immediate");
-  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Escape");
   // Two frames: the press is taken in one, and the replay is gone in it.
   const gone = await page.evaluate(() => new Promise<{ view: string; shown: boolean }>((resolve) => {
     const game = (globalThis as unknown as { __fly: Game }).__fly;
     requestAnimationFrame(() => requestAnimationFrame(() => resolve({ view: game.hands.view, shown: game.why.mesh.visible || game.why.card.visible })));
   }));
-  assert.deepEqual(gone, { view: "inside", shown: false });
-  assert.equal((await waitFor(page, "view=inside")).why, "");
+  assert.deepEqual(gone, { view: "follow", shown: false });
+  assert.equal((await waitFor(page, "view=follow")).why, "");
   assert.deepEqual(errors, [], "page errors");
   console.log("passed");
 } catch (error) {

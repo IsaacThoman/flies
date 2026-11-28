@@ -9,7 +9,7 @@ import { parseArgs } from "node:util";
 import { chromium } from "playwright";
 import { Fingers, canvasPoint, chromiumPath, contextFor, gameUp, gpuFlags, readState, screenOf, startServer, swipe, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
-import { TOOLS } from "../src/tools/hands.ts";
+import { chooseFromTray, waitForTray } from "./tray.ts";
 import { startServer as startRooms } from "../../server/src/server.ts";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, shots: { type: "string" } } });
@@ -140,7 +140,10 @@ try {
         else { const p = await canvasPoint(page, point); await page.mouse.click(p.x, p.y); }
       };
       const learned = () => page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
-      const lesson = (name: string) => page.waitForFunction((name) => JSON.parse(localStorage.getItem("flies.learned") ?? "{}")[name] === true, name);
+      const lesson = async (name: string) => {
+        await page.waitForFunction((name) => JSON.parse(localStorage.getItem("flies.learned") ?? "{}")[name] === true, name)
+          .catch((cause: unknown) => { throw new Error(`${device}: the ${name} lesson did not complete`, { cause }); });
+      };
       await shot("download");
       if (device === "remote") {
         await swipe(page, [0, 0], [0.05, 0.01]);
@@ -148,57 +151,90 @@ try {
       }
       if (device === "remote") await page.keyboard.press("Enter");
       else await press("explore");
-      await waitFor(page, "screen=play,brain=loading,activity=waiting");
+      await waitFor(page, "screen=play,brain=loading,activity=waiting,tool=hand");
       assert.equal((await readState(page)).neurons, "0");
       await shot("exploring");
+      await shot("hand-gesture");
       if (device === "remote") {
         await swipe(page, [0, 0], [0.01, 0]);
         await lesson("hand");
       }
-      for (let i = 0; i < TOOLS.length; i++) {
-        const id = TOOLS[i].id;
-        if (i > 0) {
-          if (device === "remote") await page.keyboard.press("ArrowRight");
-          else await press("tool", i);
-          await waitFor(page, `tool=${id}`);
+      const choose = (path: readonly string[]) => chooseFromTray(page, path, device === "remote" ? undefined : press);
+      type Target = "fly" | "hand" | [number, number];
+      const use = async (point: Target, during: () => Promise<unknown>) => {
+        if (device === "remote") {
+          await page.keyboard.down("Enter");
+          try { await during(); } finally { await page.keyboard.up("Enter"); }
+          return;
+        }
+        const at = typeof point === "string" ? await screenOf(page, point) : point;
+        if (device === "touch") {
+          await fingers.hold(at, during);
+        } else {
+          const p = await canvasPoint(page, at);
+          await page.mouse.move(p.x, p.y);
+          await page.mouse.down();
+          try { await during(); } finally { await page.mouse.up(); }
+        }
+      };
+      if (device === "remote") {
+        await page.keyboard.press("ArrowRight");
+        await lesson("camera");
+      } else {
+        await use("fly", () => lesson("hand"));
+      }
+      await shot("hand-used");
+      for (const [id, path] of [
+        ["feed", ["food", "sugar"]],
+        ["finger", ["finger"]],
+        ["feather", ["toys", "feather"]],
+        ["blow", ["toys", "gentle"]],
+        ["swoop", ["toys", "ball"]],
+        ["build", ["build", "tile-blue"]],
+        ["photo", ["photo"]],
+      ] as const) {
+        await choose(path);
+        await waitFor(page, `tool=${id}`);
+        const held = id === "feather" || id === "blow";
+        let point: Target = held || id === "photo" ? "fly" : "hand";
+        // Putting the kit away restores the previous framing before the photo's tap.
+        if (id === "photo") await waitForGameTime(page, 0.7);
+        if (id === "build") {
+          // The sugar and fingertip were used near the arrival spot. Build on open table.
+          await page.evaluate(() => {
+            const { hands, life } = (globalThis as unknown as { __fly: Game }).__fly;
+            life.setDown(-40, -190, 0);
+            hands.release();
+          });
+          await waitFor(page, "buildAim~^tile-blue ok");
+          await waitForGameTime(page, 0.5);
+          // When following the fly, the preview can slide past its body. Tap the actual preview.
+          if (device !== "remote") point = await page.evaluate((): [number, number] => {
+            const { builder, director } = (globalThis as unknown as { __fly: Game }).__fly;
+            const { x, y, z } = builder.aim.piece;
+            const p = director.camera.position.clone().set(x, y, z).project(director.camera);
+            return [(p.x + 1) / 2, (1 - p.y) / 2];
+          });
         }
         await shot(`${id}-gesture`);
-        if (id === "sky" || id === "view" || id === "place") {
-          if (device === "remote") await page.keyboard.press("ArrowDown");
-          else await press("kind", undefined);
-          if (id === "place") {
-            if (device === "remote") await page.keyboard.press("Enter");
-            else await press("go");
-          }
-        } else if (device === "remote") {
-          await page.keyboard.down("Enter");
-          try {
-            if (id === "feather" || id === "blow") await lesson(id);
-            else await waitForGameTime(page, 0.1);
-          } finally { await page.keyboard.up("Enter"); }
-        } else {
-          const point = await screenOf(page, "hand");
-          if (device === "touch") await fingers.hold(point, async () => {
-            if (id === "feather" || id === "blow") await lesson(id);
-            else await waitForGameTime(page, 0.1);
-          });
-          else {
-            const p = await canvasPoint(page, point);
-            await page.mouse.move(p.x, p.y);
-            await page.mouse.down();
-            try {
-              if (id === "feather" || id === "blow") await lesson(id);
-              else await waitForGameTime(page, 0.1);
-            } finally { await page.mouse.up(); }
-          }
-        }
+        // Held tools teach during the press. The others act on a pointer release.
+        await use(point, () => held ? lesson(id) : waitForGameTime(page, 0.1));
         await lesson(id);
-        if (id === "place") await page.waitForFunction(() => {
-          const game = (globalThis as unknown as { __fly: Game }).__fly;
-          if (game.here !== game.hands.place || document.getElementById("game")?.dataset.moving) return false;
-          for (let i = 0; i < game.overlay.hits.count; i++) if (game.overlay.hits.get(i)?.kind === "go") return false;
-          return true;
-        });
+        await shot(`${id}-used`);
+      }
+      for (const [id, path, state] of [
+        ["sky", ["world", "time", "morning"], "time=morning"],
+        ["view", ["look", "wide"], "view=wide"],
+        ["place", ["world", "place", "kitchen"], "place=kitchen,moving="],
+      ] as const) {
+        await choose(path.slice(0, -1));
+        await shot(`${id}-gesture`);
+        if (device === "remote") await page.keyboard.press("Space");
+        else await press("held");
+        await waitForTray(page, null);
+        await choose(path);
+        await lesson(id);
+        await waitFor(page, state);
         await shot(`${id}-used`);
       }
       // Exercise gestures before the brain arrives so a spontaneous takeoff
@@ -229,7 +265,7 @@ try {
         } finally { overlay.redraw = original; }
       });
       assert.equal(redrawProbe.distinctCallbacks, 1, "play reuses its draw callback on every frame");
-      for (const id of ["tools", ...TOOLS.map((tool) => tool.id)]) assert.equal(completed[id], true, `${device}: ${id}`);
+      for (const id of ["tray", "hand", "feed", "finger", "feather", "blow", "swoop", "build", "photo", "sky", "view", "place", ...(device === "remote" ? ["camera"] : [])]) assert.equal(completed[id], true, `${device}: ${id}`);
       // Switching hints off and on must not erase a player's history.
       await page.evaluate(() => {
         const game = (globalThis as unknown as { __fly: Game }).__fly;

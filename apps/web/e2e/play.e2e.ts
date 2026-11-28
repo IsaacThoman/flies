@@ -2,12 +2,12 @@
 // brain: boots it, waits for the brain, walks the menus with the keys (stepping
 // through where the fly lives carries it only where the choice rests), feeds
 // the fly and checks its taste senses and feed command, throws the ball until the fly takes
-// off, turns the camera with a swipe while the View tool is in hand, checks
+// off, turns and zooms the camera with arrows, checks
 // the wallpaper comes and goes with what it sees and its nervous
 // system in a corner, that the X-ray comes where the fly is big enough,
 // carries the fly to every place, leaving its footprints behind each time,
 // feeds it the weather outside as the Apple TV would, reloads and finds the
-// settings, the shelf and what the hints taught as it left them, and holds
+// settings, the chosen view and what the hints taught as it left them, and holds
 // the frame to its draw budget throughout. It holds the light at midday and
 // the weather clear, so that what the fly does answers what the test does; a
 // browser has no weather outside but what the test feeds it.
@@ -19,7 +19,8 @@
 
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { gameUp, openGame, readState, startServer, swipe, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
+import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
+import { chooseFromTray, waitForTray } from "./tray.ts";
 import { dropFood, feedHoney, refuseBitterSugar } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
@@ -55,16 +56,6 @@ const press = async (key: string, times = 1) => {
     await page.keyboard.press(key);
     await waitForGameTime(page, 0.15);
   }
-};
-/** Steps along the shelf to a tool, however many tools there are, one step at a time as the game shows each. */
-const toTool = async (id: string) => {
-  for (let i = 0; i < 12; i++) {
-    const at = (await readState(page)).tool;
-    if (at === id) return;
-    await page.keyboard.press("ArrowRight");
-    await waitFor(page, `tool~^(?!${at}$)`);
-  }
-  await waitFor(page, `tool=${id}`);
 };
 /** The player's choice of pixels, as Settings makes it: the harness holds the picture at its finest, and this only ever chooses bigger ones. */
 const pixels = (choice: string) => page.evaluate((choice) => {
@@ -125,9 +116,9 @@ try {
     Object.defineProperty(performance, "now", { configurable: true, value: () => now });
     // Canvas diagnostics publish every 200 ms; inspect the frame itself at the deadline.
     const draw = (ms: number) => { now += ms; game.frame(0.1, now); return String(game.wallpaper); };
-    const key = () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-      window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
+    const key = (key: string) => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key }));
     };
     const tap = () => {
       const rect = canvas.getBoundingClientRect();
@@ -141,14 +132,14 @@ try {
       game.frame(4, now);
       game.play();
       game.settings.wallpaperAfter = 2;
-      key();
+      key("ArrowRight");
       draw(0);
-      return [key, tap].map((wake) => {
+      return [() => key(" "), tap].map((wake) => {
         const asleep = draw(2001);
         const tool = game.hands.tool;
         wake();
         const awake = draw(0);
-        const consumed = game.hands.tool === tool;
+        const consumed = !game.tray.open && game.hands.tool === tool;
         const beforeDeadline = draw(1999);
         const afterDeadline = draw(2);
         return { asleep, awake, consumed, beforeDeadline, afterDeadline };
@@ -255,22 +246,19 @@ try {
 
   step("play: the fly is on the table, and its brain is moving it");
   await press("Enter");
-  await waitFor(page, "screen=play,stack=title>play,atRoot=false");
+  await waitFor(page, "screen=play,stack=title>play,atRoot=false,tool=hand");
 
   step("clear weather and daylight: no rain must touch the fly, and the dark ball needs a bright background for it to see");
-  // The Sky: Select steps its weather, Up and Down its time of day.
-  await toTool("sky");
-  await press("Enter");
+  await chooseFromTray(page, ["world", "weather", "clear"]);
   await waitFor(page, "sky=clock/clear,weather=clear");
-  await press("ArrowDown", 2);
+  await chooseFromTray(page, ["world", "time", "noon"]);
   await waitFor(page, "sky=noon/clear,time=noon");
   // The light changing so much can make it jump (its brain's answer): let it come down and settle before the honey drops at its mouth.
   await waitForGameTime(page, 3);
   await waitWithin(page, "mode~standing|walking", 60);
-  await toTool("feed");
 
   step("feeding: honey at its mouth reaches taste senses and the brain produces a feed command");
-  await press("ArrowDown");
+  await chooseFromTray(page, ["food", "honey"]);
   await waitFor(page, "tool=feed,variant=honey");
   await feedHoney(page, () => dropFood(page, () => press("Enter")));
   // Whether it walks off the honey is the brain's choice; footprint generation is also checked with a deterministic walker.
@@ -280,16 +268,15 @@ try {
 
   step("bitter: sugar spoiled with coffee at its mouth is tasted bitter, and the brain leaves it");
   // Clear the honey first: on two foods as sweet, the one dropped first is the one tasted.
-  await press("ArrowDown", 5);
-  await waitFor(page, "tool=feed,variant=clear");
-  await press("Enter");
+  await chooseFromTray(page, ["world", "clearFood"]);
   await waitFor(page, "food=0");
-  await press("ArrowUp");
+  await chooseFromTray(page, ["food", "laced"]);
   await waitFor(page, "tool=feed,variant=laced");
   await refuseBitterSugar(page, () => dropFood(page, () => press("Enter")));
 
   step("startle: the ball dives at it until it takes off (its brain decides; it doesn't every time)");
-  await toTool("swoop");
+  await chooseFromTray(page, ["toys", "ball"]);
+  await waitFor(page, "tool=swoop");
   let tookOff = false;
   // Its looming detectors answer how quickly the ball's darkness grows in its eyes (eyes.ts). A software
   // GPU drawing the whole picture finely hands the eyes their pictures late and few, and it took off
@@ -307,15 +294,22 @@ try {
   await pixels("classic");
   await waitWithin(page, "mode~standing|walking", 60);
 
-  step("the menu with Play/Pause, and Play/Pause carries on; the same with Back");
-  await press(" ");
+  step("Play/Pause toggles the tray, and Back leaves the view, puts the ball away, then opens the menu");
+  await press("Space");
+  await waitForTray(page, "root", 3);
+  await press("Space");
+  await waitForTray(page, null);
+  await chooseFromTray(page, ["look", "eyes"]);
+  await waitFor(page, "screen=play,view=eyes,tool=swoop");
+  await press("Escape");
+  await waitFor(page, "screen=play,view=follow,tool=swoop");
+  await press("Escape");
+  await waitFor(page, "screen=play,tool=hand");
+  await press("Escape");
   await waitFor(page, "screen=title,stack=title,focus=play,ring=true");
-  await press(" ");
+  await press("Space");
   await waitFor(page, "screen=play,stack=title>play");
-  await press("Escape");
-  await waitFor(page, "screen=title,focus=play");
-  await press("Escape");
-  await waitFor(page, "screen=play");
+  await chooseFromTray(page, ["toys", "ball"]);
 
   step("the wallpaper comes when nobody touches the remote, and any press brings the controls back");
   await page.evaluate(() => {
@@ -330,7 +324,7 @@ try {
   await waitForGameTime(page, 1.5);
   // A game-time wait after this press can exceed the two wall-clock seconds
   // on software GL. Observe the waking frame and end the idle test together.
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await page.waitForFunction(() => {
     if (document.getElementById("game")?.dataset.wallpaper !== "false") return false;
     (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0;
@@ -339,6 +333,7 @@ try {
   const back = await readState(page);
   assert.equal(back.tool, "swoop", "the press that woke it did nothing else");
   assert.equal(back.screen, "play");
+  await waitForTray(page, null);
 
   step("what it sees: while playing by default, but never over the full picture or a menu; on Wallpaper it hides while playing");
   await page.evaluate(() => {
@@ -346,14 +341,14 @@ try {
   });
   await waitFor(page, "screen=play,wallpaper=false,eyesInset=top-right");
   await press("Escape");
+  await waitFor(page, "screen=play,tool=hand");
+  await press("Escape");
   await waitFor(page, "screen=title,eyesInset=hidden");
   await press("Enter");
   await waitFor(page, "screen=play,eyesInset=top-right");
-  await toTool("view");
-  await waitFor(page, "tool=view,view=follow");
-  await press("ArrowDown", 4);
+  await chooseFromTray(page, ["look", "eyes"]);
   await waitFor(page, "view=eyes,eyesInset=hidden");
-  await press("ArrowUp", 4);
+  await chooseFromTray(page, ["look", "follow"]);
   await waitFor(page, "view=follow,eyesInset=top-right");
   await page.evaluate(() => {
     (globalThis as unknown as { __fly: Game }).__fly.settings.eyesInset = "wallpaper";
@@ -364,16 +359,22 @@ try {
   });
   await waitFor(page, "eyesInset=top-right");
 
-  step("with View in hand a swipe on the touch surface turns the camera round the fly, as far as it went, and it stays there");
+  step("Right turns the camera an eighth of a turn, and Up and Down zoom");
   const unturned = Number((await readState(page)).yaw);
-  await swipe(page, [-0.5, 0], [0.3, 0]);
-  await page.waitForFunction((yaw) => Math.abs(Number((document.getElementById("game") as HTMLCanvasElement).dataset.yaw) - yaw) > 1, unturned, { timeout: 30_000 });
+  await press("ArrowRight");
+  await page.waitForFunction((yaw) => {
+    const delta = (globalThis as unknown as { __fly: Game }).__fly.director.yaw - yaw;
+    return Math.abs(Math.atan2(Math.sin(delta + Math.PI / 4), Math.cos(delta + Math.PI / 4))) < 0.02;
+  }, unturned);
+  const reach = Number((await readState(page)).reach);
+  await press("ArrowUp");
+  await waitFor(page, `reach<${reach - 0.5}`);
+  await press("ArrowDown");
+  await waitFor(page, `reach>${reach - 0.2}`);
   await waitForGameTime(page, 0.5);
-  const swiped = Number((await readState(page)).yaw);
-  // Round by three quarters of a drag across the screen for four tenths of the surface's width: 1.2 rad, the other way.
-  assert.ok(Math.abs(Math.atan2(Math.sin(swiped - unturned + 1.2), Math.cos(swiped - unturned + 1.2))) < 0.02, `${unturned} → ${swiped}`);
+  const turned = (await readState(page)).yaw;
   await waitForGameTime(page, 3);
-  assert.equal(Number((await readState(page)).yaw), swiped, "left alone, it stays");
+  assert.equal((await readState(page)).yaw, turned, "left alone, it stays");
 
   step("its nervous system: in the corner with what it sees, the fly as glass where it is big enough to see inside, never over the full picture");
   await page.evaluate(() => {
@@ -387,7 +388,8 @@ try {
   // stroked with the feather, which its brain answers at any hour (a sleeping fly
   // included) when it strokes its face, where it rests following the fly, and
   // the glow is read while the stroke goes on.
-  await toTool("feather");
+  await chooseFromTray(page, ["toys", "feather"]);
+  await waitFor(page, "tool=feather");
   // Back to following the fly, at its face, wherever the steps before left the pointer.
   await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.hands.release());
   await waitFor(page, "pointer=following");
@@ -396,27 +398,28 @@ try {
   const stroked = await waitFor(page, "touch>0.9");
   assert.ok(/FrontLeft 1\.00/.test(stroked.touched) && /FrontRight 1\.00/.test(stroked.touched), `the feather strokes its face: ${stroked.touched}`);
   const inside = await waitWithin(page, "glow~head-bristles|bristles", 10);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}").feather === true);
   await page.keyboard.up("Enter");
   console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
   assert.ok(/head-bristles|bristles/.test(inside.glow), `the touch it feels lights its touch neurons: ${inside.glow}`);
-  await toTool("view");
-  await waitFor(page, "tool=view,view=follow,xray>0.9");
-  await press("ArrowDown");
+  await press("Escape");
+  await waitFor(page, "tool=hand,view=follow,xray>0.9");
+  await chooseFromTray(page, ["look", "wide"]);
   await waitFor(page, "view=wide,xray<0.05");
-  await press("ArrowUp");
+  await chooseFromTray(page, ["look", "follow"]);
   await waitFor(page, "view=follow,xray>0.9");
-  await press("ArrowDown", 4);
+  await chooseFromTray(page, ["look", "eyes"]);
   await waitFor(page, "view=eyes,nerves=hidden");
-  // View → Inside it shows it however the setting is.
+  // Look → Inside shows it however the setting is.
   await page.evaluate(() => {
     (globalThis as unknown as { __fly: { settings: { xray: string } } }).__fly.settings.xray = "off";
   });
-  await press("ArrowDown");
+  await chooseFromTray(page, ["look", "inside"]);
   await waitFor(page, "view=inside,nerves=top-right,xray>0.9");
-  await press("ArrowUp", 5);
+  await chooseFromTray(page, ["look", "follow"]);
   await waitFor(page, "view=follow,xray<0.05");
   // Kept for the reload at the end.
-  await press("ArrowDown");
+  await chooseFromTray(page, ["look", "wide"]);
   await waitFor(page, "view=wide");
 
   step("its stats: on Always, across the screen from the others while playing, counting its day; in the wallpaper, moving round with them");
@@ -448,16 +451,14 @@ try {
     settings.wallpaperAfter = 0;
   });
   await press("ArrowLeft");
-  await waitFor(page, "wallpaper=false,statsPanel=hidden,tool=view", 3000);
+  await waitFor(page, "wallpaper=false,statsPanel=hidden,tool=hand", 3000);
 
-  step("carried to each place in turn with the Place tool, it lives there, and the frame keeps to its budget");
+  step("carried to each place in turn through the tray, it lives there, and the frame keeps to its budget");
   // Each place is built a part a frame with everything in it drawn, and a software GPU draws a frame of
   // it at full size in seconds: built in the biggest pixels, it is a tenth of that.
   await pixels("chunkier");
-  await toTool("place");
   for (const place of PLACES.slice(1)) {
-    await press("ArrowDown");
-    await press("Enter");
+    await chooseFromTray(page, ["world", "place", place.id]);
     // A place is built a part a frame behind the veil, fifty frames or so: minutes on a software GPU.
     const arrived = await waitFor(page, `place=${place.id},moving=`, PLACE_BUILT);
     assert.equal(arrived.prints, "0", "its prints are left behind where it was");
@@ -465,17 +466,14 @@ try {
     await waitWithin(page, "mode~standing|walking", 60);
     await waitForGameTime(page, 3);
   }
-  await press("ArrowUp", PLACES.length - 1);
-  await press("Enter");
+  await chooseFromTray(page, ["world", "place", PLACES[0].id]);
   await waitFor(page, `place=${PLACES[0].id},moving=`, PLACE_BUILT);
   await pixels("classic");
 
   step("the weather outside: on Now it is what the Apple TV says, called Outside, and too old an answer goes back to the forecast");
   const before = await readState(page);
   assert.equal(before.outside, "none", "a browser can't tell the weather outside");
-  await toTool("sky");
-  // Round the weathers from Clear to Now.
-  await press("Enter", 8);
+  await chooseFromTray(page, ["world", "weather", "now"]);
   await waitFor(page, "sky~/now$,weatherFrom=forecast");
   const fog = { cloudCover: 0.8, precipitation: 0, visibility: 300, wind: 1, condition: "foggy", daylight: true, sunrise: 7, sunset: 17, noon: 12 };
   await page.evaluate((c) => (globalThis as unknown as { __fly: { outside: { feed(c: unknown): void } } }).__fly.outside.feed({ ...c, observedAt: Date.now() - 60_000 }), fog);
@@ -486,23 +484,23 @@ try {
   await page.evaluate(() => (globalThis as unknown as { __fly: { outside: { feed(c: null): void } } }).__fly.outside.feed(null));
   await waitFor(page, "outside=none,outsideAge=");
   // Clear again, kept for the reload at the end.
-  await press("Enter");
+  await chooseFromTray(page, ["world", "weather", "clear"]);
   await waitFor(page, "sky~/clear$,weatherFrom=chosen,weather=clear");
 
   step("Back to the menu, where (on the Apple TV) Back leaves the app");
   await press("Escape");
   await waitFor(page, "screen=title,atRoot=true,eyesInset=hidden,nerves=hidden");
 
-  step("a reload: the settings, the view, the light and the weather as they were left, the shelf on Feed, and the hints for what was used gone");
+  step("a reload: the settings, the view, the light and the weather as they were left, the hand empty, and the hints for what was used gone");
   await page.reload();
   await gameUp(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
   assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false, "rumble stays off after reloading");
   await press("Enter");
   const again = await waitFor(page, "screen=play");
-  assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
+  assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["hand", "hand", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
-  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "place", "sky", "swoop", "tools", "view"], "the hints for what was used aren't taught again");
+  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "camera", "feather", "feed", "place", "sky", "swoop", "tray", "view"], "the hints for what was used aren't taught again");
 
   step("three flies chosen in Settings live, see and meet each other, survive a reload, then return to one");
   await chooseFlies(page, 3);
