@@ -1352,7 +1352,10 @@ export class Game implements Shell {
   #entered() {
     const current = this.nav.current;
     if (current !== "online") this.typing?.end();
-    if (current !== "play") this.screens[current].enter();
+    if (current !== "play") {
+      this.screens[current].enter();
+      this.tray.hide();
+    }
     this.#frameRoom();
     this.#syncCamera();
     this.#grip = this.#grip && { kind: "spent" };
@@ -1380,6 +1383,7 @@ export class Game implements Shell {
     if (this.wallpaper) return;
     this.wallpaper = true;
     this.hands.release();
+    this.tray.hide();
     this.#controls.reset();
     this.director.startWallpaper();
     this.director.title = false;

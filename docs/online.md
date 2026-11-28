@@ -147,7 +147,7 @@ together; the binary fly-state layout itself is unchanged.
   back, retained seats keep their colours and positions are checked (Coming back).
 - **Going home.** Online → Go home, in any room or on the way to one: the
   flies leave it, alone again, with the place's own food and the light and
-  weather the shelf had, and are carried home, to the place they live. A
+  weather chosen at home, and are carried home, to the place they live. A
   later launch is at home too, until the player visits again.
 - **What goes wrong** is said in the heading's place, in a few words: a
   wrong password, too many tries, a full room, one that has closed, being
@@ -221,7 +221,7 @@ and at a player-created table once it has let the device in, the starter's
 included, the place is as it is made: every fly there has to meet the same
 world with its body and see it with its eyes, and the room's food is worked
 out against that world. So the pieces are put away (out of the world, not
-drawn), and the Build tool says "Only at home" and does nothing. Nobody can
+drawn), and the kit is dimmed in the tray and can't be taken up. Nobody can
 build in front of someone else's fly, and nobody sees anyone's builds. Go
 home, or leaving the table, brings them back where they were. Sharing them at
 a player's own table would mean the room carrying them, with a newer
@@ -314,12 +314,13 @@ rather than sitting at a table that may move to the restaurant.
 | pose | i8 speed (¼ body length/s), i8 turn (1/16 rad/s), u8 wings, groom, feed, crouch (1/255), i8 pitch (1/150 rad), i8 roll (1/200 rad) |
 | the hand, if out | 3 × i16 pointer, 3 × i16 camera (for the way a puff blows), each at the place's scale, u8 tool, u8 kind |
 
-The tool is its own code, not its place on the shelf, so the shelf can change
+The tool is its own code, not its place in the list of tools, so the list can change
 without the protocol (`apps/web/src/tools/hands.ts`, `toolToWire`): Feed 0,
 Swoop 1, Tickle 2, Blow 3, Sky 4 (Light's code in released builds, whose
 kinds are the Sky's times of day; Weather's 5 is read as the Sky too), View 6,
-Place 7, Finger 8, Build 9, Photo 10, new
-tools after. A code a device doesn't know (a newer device's tool) is no tool
+Place 7, Finger 8, Build 9, Photo 10, the empty hand 11, new
+tools after. The empty hand stroking a fly is sent as Tickle held, which every
+device knows, and is felt as the feather is. A code a device doesn't know (a newer device's tool) is no tool
 there, and acts on no fly.
 
 JSON, from the device:

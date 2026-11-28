@@ -221,9 +221,9 @@ held upright the fly is about two fifths of the screen across in Follow (on
 the TV, a quarter of its width) rather than a quarter (keeping the TV's width,
 a small fly in a great deal of sky and table) or a half (keeping its pixels,
 too big to turn round in). The whole table keeps its width, so it always
-fits. Playing on a short screen, where the shelf and the label take more of
-the height, the fly is raised clear of them and drawn a little smaller
-(`ui/layout.ts`, `playRoom`). Every layout (the shelf, the hints, the
+fits. Playing on a short screen, where the button at the foot takes more of
+the height, the fly is raised clear of it and drawn a little smaller
+(`ui/layout.ts`, `playRoom`). Every layout (the foot, the tray, the hints, the
 caption, the fly's-eye picture and the corner one, the title, the menus,
 About) is worked out from the frame in design units (480
 to the shorter side, and at least 1.25 CSS pixels on a touch screen, so that
